@@ -1,0 +1,43 @@
+.shell {
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 240px 1fr 280px;
+    grid-template-areas:
+        "header header header"
+        "left   canvas right";
+    height: 100vh;
+    width: 100vw;
+    background-color: hsl(var(--color-bg-app));
+    color: hsl(var(--color-text-primary));
+}
+
+.header {
+    grid-area: header;
+    border-bottom: 1px solid hsl(var(--color-border));
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-4);
+    background-color: hsl(var(--color-bg-panel));
+    z-index: 10;
+}
+
+.leftSidebar {
+    grid-area: left;
+    border-right: 1px solid hsl(var(--color-border));
+    background-color: hsl(var(--color-bg-panel));
+    padding: var(--space-2);
+}
+
+.canvasArea {
+    grid-area: canvas;
+    background-color: hsl(var(--color-bg-canvas));
+    position: relative;
+    overflow: hidden;
+}
+
+.rightSidebar {
+    grid-area: right;
+    border-left: 1px solid hsl(var(--color-border));
+    background-color: hsl(var(--color-bg-panel));
+    padding: var(--space-2);
+}
