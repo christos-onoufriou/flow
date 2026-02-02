@@ -1,0 +1,46 @@
+# Flow Development Roadmap
+
+- [ ] Implementation of core vector editing features
+  - [x] Basic shape drawing (Rectangle, Ellipse)
+  - [x] Line/Path tool implementation
+    - [x] Store support for 'line' type
+    - [x] Toolbar button
+    - [x] Canvas interaction for drawing lines
+  - [x] Text tool
+    - [x] Store support
+    - [x] Toolbar button
+    - [x] Rendering & Editing
+  - [x] Selection logic
+    - [x] Single selection
+    - [x] Multi-selection (Shift+Click, Drag select)
+    - [x] Resize/Rotate handles
+- [x] UI Components
+  - [x] Toolbar
+  - [x] Properties Panel
+    - [x] Basic properties (x, y, width, height, fill)
+    - [x] Advanced properties (stroke, opacity, corner radius)
+  - [x] Layers Panel
+    - [x] List shapes
+    - [x] Reorder shapes
+    - [x] Layers Panel: Select, Reorder, Delete
+    - [x] Layers Panel: Visibility Toggle
+    - [x] Layers Panel: Hierarchy (Nested Groups/Artboards)
+    - [x] Layers Panel: Reorder via Drag-and-Drop
+    - [x] Arranging layers within Artboards
+    - [x] Color Library (Primary, Corporate, Digital palettes + Custom)
+    - [x] Artboards (Container, Clipping, Reparenting)
+    - [x] Artboards: Selection & editing of nested items
+    - [x] Artboards: Visual Fill Update
+    - [x] Export (SVG/PNG for Canvas, Selection, Artboards)
+- [x] Keyboard Shortcuts
+  - [x] Delete (Backspace/Delete)
+  - [x] Undo/Redo (Cmd+Z/Cmd+Shift+Z)
+  - [x] Copy/Paste (Cmd+C/Cmd+V)
+  - [x] Duplicate (Cmd+D)
+  - [x] Cut (Cmd+X)
+  - [x] Group/Ungroup (Cmd+G/Cmd+Shift+G)
+- [x] Canvas Operations
+  - [x] Zoom/Pan
+  - [x] Grid/Snap to grid
+  - [x] Alignment (Left, Center, Right, Top, Middle, Bottom)
+  - [x] Distribution (Horizontal, Vertical)
