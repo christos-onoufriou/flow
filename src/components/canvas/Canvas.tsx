@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useCanvasStore } from "@/store/canvasStore";
 import { Shape } from "@/store/canvasStore";
 import { findShape } from "@/utils/shapeUtils";
+import { ZoomControls } from "./ZoomControls";
 export function Canvas() {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -201,7 +202,7 @@ export function Canvas() {
             y: snapValue(y),
             width: 0,
             height: 0,
-            fill: activeTool === 'line' ? 'transparent' : (activeTool === 'rectangle' ? '#e0e0e0' : '#d0d0ff'),
+            fill: activeTool === 'line' ? 'transparent' : '#F5F8F6',
             stroke: activeTool === 'line' ? '#000000' : undefined,
             strokeWidth: activeTool === 'line' ? 2 : undefined,
             x2: snapValue(x),
@@ -276,20 +277,78 @@ export function Canvas() {
                 let newY = initial.y;
                 let newW = initial.width;
                 let newH = initial.height;
+                const ratio = initial.width / initial.height;
 
-                if (isResizing.includes('w')) {
-                    newW = initial.width - dx;
-                    newX = initial.x + dx;
-                }
-                if (isResizing.includes('e')) {
-                    newW = initial.width + dx;
-                }
-                if (isResizing.includes('n')) {
-                    newH = initial.height - dy;
-                    newY = initial.y + dy;
-                }
-                if (isResizing.includes('s')) {
-                    newH = initial.height + dy;
+                if (initial.aspectRatioLocked) {
+                    // Aspect Ratio Locked Logic
+                    if (isResizing.includes('w')) {
+                        newW = initial.width - dx;
+                        newX = initial.x + dx;
+                        // Height determined by ratio
+                        newH = newW / ratio;
+                        // Y centring?
+                        // If we drag West, we change X and W.
+                        // H changes, so Y usually centers to keep center?
+                        // But standard behavior for side-drag is usually center-expanding for the other axis?
+                        // Let's emulate standard: dragging side expands other axis from center.
+                        newY = initial.y + (initial.height - newH) / 2;
+                    } else if (isResizing.includes('e')) {
+                        newW = initial.width + dx;
+                        newH = newW / ratio;
+                        newY = initial.y + (initial.height - newH) / 2;
+                    } else if (isResizing.includes('n')) {
+                        newH = initial.height - dy;
+                        newY = initial.y + dy;
+                        newW = newH * ratio;
+                        newX = initial.x + (initial.width - newW) / 2;
+                    } else if (isResizing.includes('s')) {
+                        newH = initial.height + dy;
+                        newW = newH * ratio;
+                        newX = initial.x + (initial.width - newW) / 2;
+                    } else {
+                        // Corners
+                        // Default to Width driving the size for simplicity in corner resize
+                        // Determine dominant delta? Or just use W.
+                        // Let's use W-based driving for NW/NE/SW/SE to start.
+
+                        if (isResizing.includes('w')) {
+                            newW = initial.width - dx;
+                            newX = initial.x + dx;
+                        } else {
+                            newW = initial.width + dx;
+                        }
+                        newH = newW / ratio;
+
+                        // Adjust Y based on H change and handle position
+                        if (isResizing.includes('n')) {
+                            // If N, Y moves.
+                            // But we calculated newH derived from W.
+                            // The delta Y (dy) from mouse might not match exactly the required H change.
+                            // So we should set Y based on the anchor (Bottom).
+                            // Anchor is Bottom (y + initial.height).
+                            newY = (initial.y + initial.height) - newH;
+                        } else {
+                            // If S, Y stays (Top fixed), height grows down.
+                            newY = initial.y;
+                        }
+                    }
+
+                } else {
+                    // Unlocked Logic (Existing)
+                    if (isResizing.includes('w')) {
+                        newW = initial.width - dx;
+                        newX = initial.x + dx;
+                    }
+                    if (isResizing.includes('e')) {
+                        newW = initial.width + dx;
+                    }
+                    if (isResizing.includes('n')) {
+                        newH = initial.height - dy;
+                        newY = initial.y + dy;
+                    }
+                    if (isResizing.includes('s')) {
+                        newH = initial.height + dy;
+                    }
                 }
 
                 if (initial.type === 'line') {
@@ -569,15 +628,20 @@ export function Canvas() {
             const id = selectedIds[0];
             const shape = findShape(shapes, id);
             if (shape && shape.type !== 'artboard') {
-                const artboard = shapes.find(s => s.type === 'artboard' &&
-                    shape.x >= s.x && shape.y >= s.y &&
-                    shape.x + shape.width <= s.x + s.width &&
-                    shape.y + shape.height <= s.y + s.height
-                );
-                if (artboard) {
-                    saveSnapshot();
-                    moveToArtboard(id, artboard.id);
-                    setSelectedIds([]);
+                // Only try to auto-nest if the shape is currently at the root level
+                const isRootShape = shapes.some(s => s.id === id);
+
+                if (isRootShape) {
+                    const artboard = shapes.find(s => s.type === 'artboard' &&
+                        shape.x >= s.x && shape.y >= s.y &&
+                        shape.x + shape.width <= s.x + s.width &&
+                        shape.y + shape.height <= s.y + s.height
+                    );
+                    if (artboard) {
+                        saveSnapshot();
+                        moveToArtboard(id, artboard.id);
+                        setSelectedIds([]);
+                    }
                 }
             }
         }
@@ -734,53 +798,112 @@ export function Canvas() {
                             {shape.textContent || 'Text'}
                         </text>
                     )}
+                    {shape.type === 'image' && (
+                        <image
+                            href={shape.src}
+                            x={shape.x}
+                            y={shape.y}
+                            width={shape.width}
+                            height={shape.height}
+                            preserveAspectRatio="none"
+                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                        />
+                    )}
+                    {shape.type === 'video' && (
+                        <foreignObject
+                            x={shape.x}
+                            y={shape.y}
+                            width={shape.width}
+                            height={shape.height}
+                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                        >
+                            <video
+                                src={shape.src}
+                                width="100%"
+                                height="100%"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                controls={false}
+                                autoPlay
+                                loop
+                                muted
+                            />
+                        </foreignObject>
+                    )}
 
                     {/* Selection Controls (Only for Top-Level Selected Items) */}
                     {isSelected && !drawingShape && !isChild && (
-                        <>
-                            {/* Bounding Box for Group or Single Item */}
-                            <rect
-                                x={shape.x}
-                                y={shape.y}
-                                width={shape.width}
-                                height={shape.height}
-                                fill="none"
-                                stroke="hsl(var(--color-accent))"
-                                strokeWidth={1 / zoom}
-                                pointerEvents="none"
-                                strokeDasharray={shape.type === 'group' ? "4 2" : undefined}
-                            />
+                        shape.type === 'line' ? (
+                            <>
+                                {/* Line Handles */}
+                                <circle
+                                    cx={shape.x}
+                                    cy={shape.y}
+                                    r={6 / zoom}
+                                    fill="white"
+                                    stroke="hsl(var(--color-accent))"
+                                    strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'start')}
+                                    style={{ cursor: 'move' }}
+                                />
+                                <circle
+                                    cx={shape.x2 ?? shape.x}
+                                    cy={shape.y2 ?? shape.y}
+                                    r={6 / zoom}
+                                    fill="white"
+                                    stroke="hsl(var(--color-accent))"
+                                    strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'end')}
+                                    style={{ cursor: 'move' }}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                {/* Bounding Box for Group or Single Item */}
+                                <rect
+                                    x={shape.x}
+                                    y={shape.y}
+                                    width={shape.width}
+                                    height={shape.height}
+                                    fill="none"
+                                    stroke="hsl(var(--color-accent))"
+                                    strokeWidth={1 / zoom}
+                                    pointerEvents="none"
+                                    strokeDasharray={shape.type === 'group' ? "4 2" : undefined}
+                                />
 
-                            {/* Handles (Common for all types including Group) */}
-                            {/* TL */}
-                            <rect x={shape.x - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'nw')} style={{ cursor: 'nwse-resize' }} />
-                            {/* TR */}
-                            <rect x={shape.x + shape.width - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'ne')} style={{ cursor: 'nesw-resize' }} />
-                            {/* BL */}
-                            <rect x={shape.x - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'sw')} style={{ cursor: 'nesw-resize' }} />
-                            {/* BR */}
-                            <rect x={shape.x + shape.width - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'se')} style={{ cursor: 'nwse-resize' }} />
+                                {/* Handles (Common for all types including Group) */}
+                                {/* TL */}
+                                <rect x={shape.x - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'nw')} style={{ cursor: 'nwse-resize' }} />
+                                {/* TR */}
+                                <rect x={shape.x + shape.width - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'ne')} style={{ cursor: 'nesw-resize' }} />
+                                {/* BL */}
+                                <rect x={shape.x - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'sw')} style={{ cursor: 'nesw-resize' }} />
+                                {/* BR */}
+                                <rect x={shape.x + shape.width - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'se')} style={{ cursor: 'nwse-resize' }} />
 
-                            {/* Rotation Handle */}
-                            <line
-                                x1={shape.x + shape.width / 2} y1={shape.y}
-                                x2={shape.x + shape.width / 2} y2={shape.y - 20 / zoom}
-                                stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                            />
-                            <circle
-                                cx={shape.x + shape.width / 2} cy={shape.y - 20 / zoom} r={4 / zoom}
-                                fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'grab' }}
-                            />
-                        </>
+                                {/* Rotation Handle */}
+                                <line
+                                    x1={shape.x + shape.width / 2} y1={shape.y}
+                                    x2={shape.x + shape.width / 2} y2={shape.y - 20 / zoom}
+                                    stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                />
+                                <circle
+                                    cx={shape.x + shape.width / 2} cy={shape.y - 20 / zoom} r={4 / zoom}
+                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'grab' }}
+                                />
+                            </>
+                        )
                     )}
                 </g>
             </React.Fragment>
@@ -841,9 +964,7 @@ export function Canvas() {
             </svg>
 
             {/* HUD */}
-            <div style={{ position: 'absolute', bottom: 16, left: 16, background: 'hsl(var(--color-bg-panel))', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid hsl(var(--color-border))', pointerEvents: 'none', color: 'hsl(var(--color-text-secondary))' }}>
-                {Math.round(zoom * 100)}% | {Math.round(offset.x)}, {Math.round(offset.y)}
-            </div>
+            <ZoomControls />
         </div>
     );
 }

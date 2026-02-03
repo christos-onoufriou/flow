@@ -8,6 +8,8 @@ import { findShape } from "@/utils/shapeUtils";
 export function PropertiesPanel() {
     const { selectedIds, shapes, updateShape, reorderShape, saveSnapshot, alignShapes, distributeShapes } = useCanvasStore();
 
+    const [activePopup, setActivePopup] = useState<string | null>(null);
+
     if (selectedIds.length === 0) {
         return (
             <div style={{ padding: "var(--space-4)" }}>
@@ -85,9 +87,13 @@ export function PropertiesPanel() {
 
     if (!shape) return null;
 
-    const handleChange = (key: keyof typeof shape, value: string | number) => {
+    const handleChange = (key: keyof typeof shape, value: any, key2?: keyof typeof shape, value2?: any) => {
         saveSnapshot(); // Save before update
-        updateShape(primaryId, { [key]: value });
+        if (key2 && value2 !== undefined) {
+            updateShape(primaryId, { [key]: value, [key2]: value2 });
+        } else {
+            updateShape(primaryId, { [key]: value });
+        }
     };
 
     const handleReorder = (action: 'front' | 'back' | 'forward' | 'backward') => {
@@ -106,6 +112,7 @@ export function PropertiesPanel() {
                 </div>
 
                 {/* Dimensions / Coordinates */}
+                {/* Dimensions / Coordinates */}
                 {shape.type === 'line' ? (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                         <LabelInput label="X1" value={Math.round(shape.x)} onChange={(v) => handleChange('x', Number(v))} />
@@ -114,12 +121,64 @@ export function PropertiesPanel() {
                         <LabelInput label="Y2" value={Math.round(shape.y2 ?? shape.y)} onChange={(v) => handleChange('y2', Number(v))} />
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                        <LabelInput label="X" value={Math.round(shape.x)} onChange={(v) => handleChange('x', Number(v))} />
-                        <LabelInput label="Y" value={Math.round(shape.y)} onChange={(v) => handleChange('y', Number(v))} />
-                        <LabelInput label="W" value={Math.round(shape.width)} onChange={(v) => handleChange('width', Number(v))} />
-                        <LabelInput label="H" value={Math.round(shape.height)} onChange={(v) => handleChange('height', Number(v))} />
-                        <LabelInput label="R" value={Math.round(shape.rotation || 0)} onChange={(v) => handleChange('rotation', Number(v))} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                            <LabelInput label="X" value={Math.round(shape.x)} onChange={(v) => handleChange('x', Number(v))} />
+                            <LabelInput label="Y" value={Math.round(shape.y)} onChange={(v) => handleChange('y', Number(v))} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                                <LabelInput
+                                    label="W"
+                                    value={Math.round(shape.width)}
+                                    onChange={(v) => {
+                                        const newW = Number(v);
+                                        if (shape.aspectRatioLocked) {
+                                            const ratio = shape.height / shape.width;
+                                            handleChange('height', newW * ratio, 'width', newW);
+                                        } else {
+                                            handleChange('width', newW);
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <LabelInput
+                                    label="H"
+                                    value={Math.round(shape.height)}
+                                    onChange={(v) => {
+                                        const newH = Number(v);
+                                        if (shape.aspectRatioLocked) {
+                                            const ratio = shape.width / shape.height;
+                                            handleChange('width', newH * ratio, 'height', newH);
+                                        } else {
+                                            handleChange('height', newH);
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <button
+                                onClick={() => handleChange('aspectRatioLocked', !shape.aspectRatioLocked)}
+                                title={shape.aspectRatioLocked ? "Unlock Aspect Ratio" : "Lock Aspect Ratio"}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    color: shape.aspectRatioLocked ? 'hsl(var(--color-accent))' : 'hsl(var(--color-text-muted))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >
+                                {shape.aspectRatioLocked ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                ) : (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                                )}
+                            </button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                            <LabelInput label="R" value={Math.round(shape.rotation || 0)} onChange={(v) => handleChange('rotation', Number(v))} />
+                        </div>
                     </div>
                 )}
 
@@ -154,14 +213,24 @@ export function PropertiesPanel() {
                     {shape.type !== 'line' && shape.type !== 'text' && (
                         <div>
                             <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Fill</label>
-                            <ColorInput value={shape.fill} onChange={(v) => handleChange('fill', v)} />
+                            <ColorInput
+                                value={shape.fill}
+                                onChange={(v) => handleChange('fill', v)}
+                                isOpen={activePopup === 'fill'}
+                                onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
+                            />
                         </div>
                     )}
 
                     {shape.type === 'text' && (
                         <div>
                             <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Color</label>
-                            <ColorInput value={shape.fill} onChange={(v) => handleChange('fill', v)} />
+                            <ColorInput
+                                value={shape.fill}
+                                onChange={(v) => handleChange('fill', v)}
+                                isOpen={activePopup === 'fill'}
+                                onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
+                            />
                         </div>
                     )}
 
@@ -169,7 +238,12 @@ export function PropertiesPanel() {
                         <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Stroke</label>
                         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                             <div style={{ flex: 1 }}>
-                                <ColorInput value={shape.stroke || '#000000'} onChange={(v) => handleChange('stroke', v)} />
+                                <ColorInput
+                                    value={shape.stroke || '#000000'}
+                                    onChange={(v) => handleChange('stroke', v)}
+                                    isOpen={activePopup === 'stroke'}
+                                    onToggle={() => setActivePopup(activePopup === 'stroke' ? null : 'stroke')}
+                                />
                             </div>
                             <div style={{ width: '60px' }}>
                                 <LabelInput label="W" value={shape.strokeWidth || 0} onChange={(v) => handleChange('strokeWidth', Number(v))} />
@@ -222,7 +296,7 @@ export function PropertiesPanel() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -260,16 +334,14 @@ const PALETTES = {
     Digital: ['#7D55C3', '#FA4505', '#FA8FE3', '#2659E0', '#E3ED00', '#00A64A']
 };
 
-function ColorInput({ value, onChange }: { value: string, onChange: (val: string) => void }) {
-    const [showPalette, setShowPalette] = React.useState(false);
-
+function ColorInput({ value, onChange, isOpen, onToggle }: { value: string, onChange: (val: string) => void, isOpen: boolean, onToggle: () => void }) {
     return (
         <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <div
-                    onClick={() => setShowPalette(!showPalette)}
+                    onClick={onToggle}
                     style={{
-                        width: '24px', height: '24px', borderRadius: '4px',
+                        width: '24px', height: '24px', borderRadius: '50%',
                         backgroundColor: value, border: '1px solid hsl(var(--color-border))',
                         position: 'relative', overflow: 'hidden', flexShrink: 0,
                         cursor: 'pointer'
@@ -293,25 +365,27 @@ function ColorInput({ value, onChange }: { value: string, onChange: (val: string
                 />
             </div>
 
-            {showPalette && (
+            {isOpen && (
                 <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                    marginTop: '4px', background: 'hsl(var(--color-bg-panel))',
-                    border: '1px solid hsl(var(--color-border))', borderRadius: '4px',
-                    padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                    position: 'absolute', top: '-8px', right: 'calc(100% + 33px)', width: '200px', zIndex: 50,
+                    marginTop: '0px', background: 'hsl(var(--color-bg-panel))',
+                    border: '1px solid hsl(var(--color-border))', borderRadius: '12px',
+                    padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    boxSizing: 'border-box'
                 }}>
                     {/* Primary */}
                     <div style={{ marginBottom: '8px' }}>
-                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase' }}>Primary</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Primary</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
                             {PALETTES.Primary.map(c => (
                                 <button
                                     key={c}
-                                    onClick={() => { onChange(c); setShowPalette(false); }}
+                                    onClick={() => { onChange(c); onToggle(); }}
                                     style={{
                                         width: '100%', aspectRatio: '1/1', background: c,
                                         border: value === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)',
-                                        borderRadius: '2px', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)'
+                                        borderRadius: '50%', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)',
+                                        appearance: 'none', margin: 0
                                     }}
                                 />
                             ))}
@@ -319,16 +393,17 @@ function ColorInput({ value, onChange }: { value: string, onChange: (val: string
                     </div>
                     {/* Secondary Corporate */}
                     <div style={{ marginBottom: '8px' }}>
-                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase' }}>Corporate</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Corporate</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
                             {PALETTES.Corporate.map(c => (
                                 <button
                                     key={c}
-                                    onClick={() => { onChange(c); setShowPalette(false); }}
+                                    onClick={() => { onChange(c); onToggle(); }}
                                     style={{
                                         width: '100%', aspectRatio: '1/1', background: c,
                                         border: value === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)',
-                                        borderRadius: '2px', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)'
+                                        borderRadius: '50%', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)',
+                                        appearance: 'none', margin: 0
                                     }}
                                 />
                             ))}
@@ -336,16 +411,17 @@ function ColorInput({ value, onChange }: { value: string, onChange: (val: string
                     </div>
                     {/* Secondary Digital */}
                     <div>
-                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase' }}>Digital</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                        <div style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Digital</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
                             {PALETTES.Digital.map(c => (
                                 <button
                                     key={c}
-                                    onClick={() => { onChange(c); setShowPalette(false); }}
+                                    onClick={() => { onChange(c); onToggle(); }}
                                     style={{
                                         width: '100%', aspectRatio: '1/1', background: c,
                                         border: value === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)',
-                                        borderRadius: '2px', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)'
+                                        borderRadius: '50%', cursor: 'pointer', padding: 0, outline: '1px solid rgba(0,0,0,0.1)',
+                                        appearance: 'none', margin: 0
                                     }}
                                 />
                             ))}
@@ -356,7 +432,7 @@ function ColorInput({ value, onChange }: { value: string, onChange: (val: string
                     <div style={{ marginTop: '8px', borderTop: '1px solid hsl(var(--color-border))', paddingTop: '8px' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
                             <div style={{
-                                width: '16px', height: '16px', borderRadius: '50%',
+                                width: '20px', height: '20px', borderRadius: '50%',
                                 background: 'conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red)',
                                 border: '1px solid rgba(0,0,0,0.1)'
                             }} />

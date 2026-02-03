@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export interface Shape {
     id: string;
-    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard';
+    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard' | 'image' | 'video';
     x: number;
     y: number;
     width: number;
@@ -14,12 +14,14 @@ export interface Shape {
     y2?: number;
     rotation?: number; // Degrees
     textContent?: string;
+    src?: string; // For Image/Video
     fontSize?: number;
     fontFamily?: string;
     children?: Shape[];
     visible?: boolean;
     opacity?: number;
     cornerRadius?: number;
+    aspectRatioLocked?: boolean;
 }
 
 interface CanvasState {

@@ -1,0 +1,48 @@
+.actionButton {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: hsl(var(--color-border));
+    color: hsl(var(--color-text-primary));
+    padding: 4px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    transition: background-color 0.2s ease;
+}
+
+.actionButton:hover:not(:disabled) {
+    background-color: hsl(var(--color-accent));
+}
+
+.actionButton:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.toolButton {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    color: inherit;
+    font-size: var(--text-sm);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.toolButton:hover:not([data-active="true"]) {
+    color: #00DEF8;
+}
+
+.toolButton[data-active="true"] {
+    background-color: hsl(var(--color-accent));
+    color: hsl(var(--color-accent-fg));
+}
+
+.toolButton[data-open="true"] {
+    background-color: hsl(var(--color-bg-panel));
+}
