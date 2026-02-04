@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
+import { useCanvasStore, Shape } from "@/store/canvasStore";
+
 interface TemplatesModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -12,8 +14,41 @@ const CATEGORIES = ['Instagram', 'LinkedIn', 'Facebook', 'TikTok', 'YouTube'];
 
 export function TemplatesModal({ isOpen, onClose }: TemplatesModalProps) {
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
+    const { templates, addShape } = useCanvasStore();
 
     if (!isOpen) return null;
+
+    const filteredTemplates = templates.filter(t => t.platform === selectedCategory);
+
+    // Fill up to 8 slots, mixing real templates with placeholders if needed
+    // or just show templates + placeholders to fill grid? 
+    // User requirement: "placed as an image in a placeholder".
+    // Let's overlay templates on the grid.
+    const displayItems = Array.from({ length: 8 }).map((_, i) => filteredTemplates[i] || null);
+
+    const handleTemplateClick = (template: any) => {
+        if (!template) return;
+
+        // Clone and re-ID
+        const cloneShape = (s: Shape): Shape => {
+            const newId = crypto.randomUUID();
+            const children = s.children?.map(child => cloneShape(child));
+            return { ...s, id: newId, children };
+        };
+
+        const artboard = cloneShape(template.shapes[0]);
+        // Offset slightly to avoid exact overlap if multiple added? 
+        // Or just place at center? Store handles offset usually? 
+        // Let's just add it. `addShape` usually puts it at 0,0 or we might want to offset based on viewport but that's complex.
+        // We'll trust the saved coordinates for now, or maybe move it to appear in center of view.
+        // For now, keep saved coordinates.
+
+        artboard.x += 20; // Slight offset so user sees it's new
+        artboard.y += 20;
+
+        addShape(artboard);
+        onClose();
+    };
 
     return (
         <div style={{
@@ -73,9 +108,10 @@ export function TemplatesModal({ isOpen, onClose }: TemplatesModalProps) {
                     gap: 'var(--space-4)',
                     marginBottom: 'var(--space-6)'
                 }}>
-                    {Array.from({ length: 8 }).map((_, i) => (
+                    {displayItems.map((template, i) => (
                         <div
-                            key={i}
+                            key={template ? template.id : i}
+                            onClick={() => handleTemplateClick(template)}
                             style={{
                                 aspectRatio: '1/1',
                                 border: '1px solid hsl(var(--color-border))',
@@ -85,10 +121,21 @@ export function TemplatesModal({ isOpen, onClose }: TemplatesModalProps) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: 'hsl(var(--color-text-muted))',
-                                fontSize: 'var(--text-xs)'
+                                fontSize: 'var(--text-xs)',
+                                cursor: template ? 'pointer' : 'default',
+                                overflow: 'hidden',
+                                position: 'relative'
                             }}
                         >
-                            Placeholder
+                            {template ? (
+                                <img
+                                    src={template.thumbnail}
+                                    alt={template.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                />
+                            ) : (
+                                "Placeholder"
+                            )}
                         </div>
                     ))}
                 </div>

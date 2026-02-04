@@ -3,9 +3,21 @@
   "configurations": [
     {
       "name": "Next.js: debug",
-      "type": "node-terminal",
       "request": "launch",
-      "command": "npm run dev"
+      "type": "node",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Local:.*(http://localhost:[0-9]+)",
+        "uriFormat": "%s"
+      }
     }
   ]
 }

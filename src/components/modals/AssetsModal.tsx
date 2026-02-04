@@ -8,7 +8,7 @@ interface AssetsModalProps {
     onClose: () => void;
 }
 
-const CATEGORIES = ['Logos', 'Icons'];
+const CATEGORIES = ['Logos', 'Shapes', 'Icons'];
 
 export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);

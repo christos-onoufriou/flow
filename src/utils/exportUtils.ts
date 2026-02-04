@@ -105,7 +105,26 @@ export const generateSVGString = (shapes: Shape[], bounds?: { x: number, y: numb
     const padding = 20;
     const viewBox = `${finalBounds.x - padding} ${finalBounds.y - padding} ${finalBounds.width + padding * 2} ${finalBounds.height + padding * 2}`;
 
+    // Inject CSS variables for fonts
+    // Ideally we would inject actual @font-face rules, but for now we assume system fonts
+    // or we need to inline the font CSS if it's available.
+    // For this environment, we will try to pass the variabl definitions we know.
+    const styleBlock = `
+        <style>
+            :root {
+                --font-aeonik-pro: 'Aeonik Pro', sans-serif;
+                --font-roboto: 'Roboto', sans-serif;
+                --font-open-sans: 'Open Sans', sans-serif;
+                --font-lato: 'Lato', sans-serif;
+            }
+            text {
+                font-family: var(--font-aeonik-pro);
+            }
+        </style>
+    `;
+
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${finalBounds.width + padding * 2}" height="${finalBounds.height + padding * 2}">
+        ${styleBlock}
         ${content}
     </svg>`;
 };
@@ -127,26 +146,38 @@ export const exportSelectionToSVG = (shapes: Shape[], filename: string = 'export
     downloadBlob(blob, filename);
 };
 
-export const exportSelectionToPNG = (shapes: Shape[], filename: string = 'export.png') => {
-    const svgString = generateSVGString(shapes);
-    const img = new Image();
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+export const generatePNGDataURL = (shapes: Shape[]): Promise<string> => {
+    return new Promise((resolve) => {
+        const svgString = generateSVGString(shapes);
+        const img = new Image();
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
 
-    img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((pngBlob) => {
-                if (pngBlob) {
-                    downloadBlob(pngBlob, filename);
-                }
-                URL.revokeObjectURL(url);
-            });
-        }
-    };
-    img.src = url;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const dataURL = canvas.toDataURL('image/png');
+                resolve(dataURL);
+            } else {
+                resolve('');
+            }
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    });
+};
+
+export const exportSelectionToPNG = (shapes: Shape[], filename: string = 'export.png') => {
+    generatePNGDataURL(shapes).then(dataURL => {
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
 };

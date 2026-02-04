@@ -17,11 +17,17 @@ export interface Shape {
     src?: string; // For Image/Video
     fontSize?: number;
     fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: 'normal' | 'italic';
+    textAlign?: 'left' | 'center' | 'right';
     children?: Shape[];
     visible?: boolean;
     opacity?: number;
     cornerRadius?: number;
     aspectRatioLocked?: boolean;
+    isTemplate?: boolean;
+    templatePlatform?: string;
+    templateBusiness?: string;
 }
 
 interface CanvasState {
@@ -57,6 +63,19 @@ interface CanvasState {
     toggleVisibility: (id: string) => void;
     moveToArtboard: (shapeId: string, artboardId: string | null) => void;
     moveLayer: (dragId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
+    templates: Template[];
+    addTemplate: (template: Template) => void;
+}
+
+export interface Template {
+    id: string;
+    name: string;
+    thumbnail: string;
+    shapes: Shape[];
+    platform: string;
+    business: string;
+    width: number;
+    height: number;
 }
 
 // Recursively reorder a shape by ID
@@ -212,6 +231,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     clipboard: [],
     snapToGrid: true,
     gridSize: 20,
+    templates: [],
+    addTemplate: (template) => set((state) => ({ templates: [...state.templates, template] })),
 
     setOffset: (updater) => set((state) => {
         const newOffset = typeof updater === 'function' ? updater(state.offset) : updater;

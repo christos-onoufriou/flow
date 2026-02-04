@@ -16,6 +16,7 @@ export function Canvas() {
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<string | null>(null); // 'nw', 'ne', 'sw', 'se'
     const [isRotating, setIsRotating] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null); // Track which shape is being edited inline
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 }); // World coords
     const [initialShapePositions, setInitialShapePositions] = useState<{ [id: string]: Shape }>({});
 
@@ -26,6 +27,15 @@ export function Canvas() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // If editing text inline, do not process global shortcuts
+            if (editingId) return;
+
+            // If user is typing in an input or textarea (e.g., Properties Panel), ignore global shortcuts
+            const activeElement = document.activeElement as HTMLElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                return;
+            }
+
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (selectedIds.length > 0) {
                     saveSnapshot();
@@ -75,7 +85,7 @@ export function Canvas() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedIds, removeShape, setSelectedIds]);
+    }, [selectedIds, removeShape, setSelectedIds, editingId, redo, undo, copy, paste, group, ungroup, toggleSnapToGrid]);
 
     // Wheel handling for Pan and Zoom
     const handleWheel = (e: React.WheelEvent) => {
@@ -104,6 +114,17 @@ export function Canvas() {
     };
 
     const handleShapeMouseDown = (e: React.MouseEvent, id: string) => {
+        // If we are currently editing this shape, do nothing (let text interaction happen)
+        if (editingId === id) {
+            e.stopPropagation();
+            return;
+        }
+
+        // If editing another shape, finish editing that one
+        if (editingId && editingId !== id) {
+            setEditingId(null);
+        }
+
         if (activeTool !== 'select') return;
         e.stopPropagation();
 
@@ -137,6 +158,14 @@ export function Canvas() {
         setInitialShapePositions(initialPos);
         saveSnapshot(); // Save before move
         setIsDragging(true);
+    };
+
+    const handleShapeDoubleClick = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        const shape = findShape(shapes, id);
+        if (shape && shape.type === 'text') {
+            setEditingId(id);
+        }
     };
 
     const handleHandleMouseDown = (e: React.MouseEvent, id: string, handle: string) => {
@@ -180,12 +209,15 @@ export function Canvas() {
                 type: 'text',
                 x,
                 y,
-                width: 100, // Default width for selection box
-                height: 30, // Default height
+                width: 240, // Default width to fit size 64 Text
+                height: 80, // Default height to fit size 64
                 fill: 'black',
                 textContent: 'Text',
-                fontSize: 16,
-                fontFamily: 'sans-serif',
+                fontSize: 64,
+                fontFamily: 'var(--font-aeonik-pro)',
+                fontWeight: '400',
+                fontStyle: 'normal',
+                textAlign: 'left',
                 rotation: 0
             };
             saveSnapshot(); // Save before create
@@ -666,6 +698,32 @@ export function Canvas() {
                 if (finalShape.width > 2 && finalShape.height > 2) {
                     saveSnapshot();
                     addShape(finalShape);
+
+                    if (finalShape.type === 'artboard') {
+                        setTimeout(() => {
+                            if (containerRef.current) {
+                                const rect = containerRef.current.getBoundingClientRect();
+                                const viewportW = rect.width;
+                                const viewportH = rect.height;
+                                const padding = 60;
+
+                                // Calculate scale to fit
+                                const scaleX = (viewportW - padding * 2) / finalShape.width;
+                                const scaleY = (viewportH - padding * 2) / finalShape.height;
+                                const newZoom = Math.min(scaleX, scaleY, 2);
+
+                                // Calculate offset to center
+                                const centerX = finalShape.x + finalShape.width / 2;
+                                const centerY = finalShape.y + finalShape.height / 2;
+
+                                const newOffsetX = (viewportW / 2) - (centerX * newZoom);
+                                const newOffsetY = (viewportH / 2) - (centerY * newZoom);
+
+                                setZoom(newZoom);
+                                setOffset({ x: newOffsetX, y: newOffsetY });
+                            }
+                        }, 50);
+                    }
                 }
             } else {
                 const dist = Math.sqrt(Math.pow((finalShape.x2 ?? 0) - finalShape.x, 2) + Math.pow((finalShape.y2 ?? 0) - finalShape.y, 2));
@@ -785,18 +843,76 @@ export function Canvas() {
                         />
                     )}
                     {shape.type === 'text' && (
-                        <text
+                        <foreignObject
                             x={shape.x}
                             y={shape.y}
-                            fontSize={shape.fontSize || 16}
-                            fontFamily={shape.fontFamily || 'sans-serif'}
-                            fill={shape.fill || 'black'}
-                            style={{ userSelect: 'none', cursor: 'default', pointerEvents: isChild ? 'none' : 'auto' }}
-                            dominantBaseline="hanging"
+                            width={shape.width}
+                            height={shape.height}
                             onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                            onDoubleClick={(e) => !isChild && handleShapeDoubleClick(e, shape.id)}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto', overflow: 'visible' }}
                         >
-                            {shape.textContent || 'Text'}
-                        </text>
+                            {editingId === shape.id ? (
+                                <div
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    onBlur={(e) => {
+                                        updateShape(shape.id, { textContent: e.currentTarget.innerText });
+                                        setEditingId(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation(); // Prevent canvas deletion etc
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        fontSize: `${shape.fontSize || 16}px`,
+                                        fontFamily: shape.fontFamily || 'sans-serif',
+                                        fontWeight: shape.fontWeight || '400',
+                                        fontStyle: shape.fontStyle || 'normal',
+                                        textAlign: shape.textAlign || 'left',
+                                        color: shape.fill || 'black',
+                                        wordWrap: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                        userSelect: 'text',
+                                        cursor: 'text',
+                                        lineHeight: 1.2,
+                                        outline: 'none',
+                                        minHeight: '1em'
+                                    }}
+                                    ref={(el) => {
+                                        if (el) {
+                                            // Focus and select all on mount if needed, or just focus
+                                            // setTimeout(() => el.focus(), 0); 
+                                            // Simple focus might cause issue if re-rendering, but let's try autoFocus doesn't work on div
+                                            if (document.activeElement !== el) el.focus();
+                                        }
+                                    }}
+                                >
+                                    {shape.textContent || 'Text'}
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        fontSize: `${shape.fontSize || 16}px`,
+                                        fontFamily: shape.fontFamily || 'sans-serif',
+                                        fontWeight: shape.fontWeight || '400',
+                                        fontStyle: shape.fontStyle || 'normal',
+                                        textAlign: shape.textAlign || 'left',
+                                        color: shape.fill || 'black',
+                                        wordWrap: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                        userSelect: 'none',
+                                        cursor: 'default',
+                                        lineHeight: 1.2
+                                    }}
+                                >
+                                    {shape.textContent || 'Text'}
+                                </div>
+                            )}
+                        </foreignObject>
                     )}
                     {shape.type === 'image' && (
                         <image

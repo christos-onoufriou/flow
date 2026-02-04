@@ -6,9 +6,28 @@ import { exportSelectionToSVG, exportSelectionToPNG } from "@/utils/exportUtils"
 import { findShape } from "@/utils/shapeUtils";
 
 export function PropertiesPanel() {
-    const { selectedIds, shapes, updateShape, reorderShape, saveSnapshot, alignShapes, distributeShapes } = useCanvasStore();
+    return (
+        <>
+            <style jsx global>{`
+                .no-spin::-webkit-inner-spin-button, 
+                .no-spin::-webkit-outer-spin-button { 
+                    -webkit-appearance: none; 
+                    margin: 0; 
+                }
+                .no-spin {
+                    -moz-appearance: textfield;
+                }
+            `}</style>
+            <PropertiesPanelContent />
+        </>
+    );
+}
+
+function PropertiesPanelContent() {
+    const { selectedIds, shapes, updateShape, reorderShape, saveSnapshot, alignShapes, distributeShapes, addTemplate } = useCanvasStore();
 
     const [activePopup, setActivePopup] = useState<string | null>(null);
+    // ... (lines 31-447 unchanged effectively, just context)
 
     if (selectedIds.length === 0) {
         return (
@@ -204,8 +223,147 @@ export function PropertiesPanel() {
                                     }}
                                 />
                             </div>
+                            {/* Row 1: Font and Weight */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                                <LabelInput label="Size" value={shape.fontSize || 16} onChange={(v) => handleChange('fontSize', Number(v))} />
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Font</label>
+                                    <select
+                                        value={shape.fontFamily || 'var(--font-aeonik-pro)'}
+                                        onChange={(e) => handleChange('fontFamily', e.target.value)}
+                                        style={{
+                                            background: 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            padding: '0 4px',
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            width: '100%',
+                                            height: '24px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    >
+                                        <option value="var(--font-aeonik-pro)">Aeonik Pro</option>
+                                        <option value="var(--font-roboto)">Roboto</option>
+                                        <option value="var(--font-open-sans)">Open Sans</option>
+                                        <option value="var(--font-lato)">Lato</option>
+                                        <option value="serif">Serif</option>
+                                        <option value="monospace">Mono</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Weight</label>
+                                    <select
+                                        value={shape.fontWeight || '400'}
+                                        onChange={(e) => handleChange('fontWeight', e.target.value)}
+                                        style={{
+                                            background: 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            padding: '0 4px',
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            width: '100%',
+                                            height: '24px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    >
+                                        <option value="100">Air</option>
+                                        <option value="200">Thin</option>
+                                        <option value="300">Light</option>
+                                        <option value="400">Normal</option>
+                                        <option value="500">Medium</option>
+                                        <option value="700">Bold</option>
+                                        <option value="900">Black</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Row 2: Size, Style, Align */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '80px 40px 1fr', gap: 'var(--space-2)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Size</label>
+                                    <input
+                                        type="number"
+                                        value={shape.fontSize || 16}
+                                        onChange={(e) => handleChange('fontSize', Number(e.target.value))}
+                                        className="no-spin"
+                                        style={{
+                                            background: 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            padding: '0 4px', // Reduced top/bottom padding, rely on height/flex
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            width: '100%',
+                                            height: '24px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Style</label>
+                                    <button
+                                        title="Italic"
+                                        onClick={() => handleChange('fontStyle', (shape.fontStyle === 'italic' ? 'normal' : 'italic'))}
+                                        style={{
+                                            padding: '0',
+                                            background: shape.fontStyle === 'italic' ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            height: '24px',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    >
+                                        <span style={{ fontStyle: 'italic', fontWeight: 'bold', fontFamily: 'serif' }}>I</span>
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Align</label>
+                                    <div style={{ display: 'flex', border: '1px solid hsl(var(--color-border))', borderRadius: '4px', overflow: 'hidden', height: '24px', boxSizing: 'border-box' }}>
+                                        <button
+                                            title="Align Left"
+                                            onClick={() => handleChange('textAlign', 'left')}
+                                            style={{
+                                                flex: 1, padding: '0', background: (!shape.textAlign || shape.textAlign === 'left') ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))',
+                                                borderRight: '1px solid hsl(var(--color-border))', color: 'hsl(var(--color-text-primary))', cursor: 'pointer', display: 'flex', justifyContent: 'center',
+                                                alignItems: 'center', height: '100%'
+                                            }}
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="2" /><rect x="3" y="11" width="10" height="2" /><rect x="3" y="17" width="14" height="2" /></svg>
+                                        </button>
+                                        <button
+                                            title="Align Center"
+                                            onClick={() => handleChange('textAlign', 'center')}
+                                            style={{
+                                                flex: 1, padding: '0', background: shape.textAlign === 'center' ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))',
+                                                borderRight: '1px solid hsl(var(--color-border))', color: 'hsl(var(--color-text-primary))', cursor: 'pointer', display: 'flex', justifyContent: 'center',
+                                                alignItems: 'center', height: '100%'
+                                            }}
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="2" /><rect x="7" y="11" width="10" height="2" /><rect x="5" y="17" width="14" height="2" /></svg>
+                                        </button>
+                                        <button
+                                            title="Align Right"
+                                            onClick={() => handleChange('textAlign', 'right')}
+                                            style={{
+                                                flex: 1, padding: '0', background: shape.textAlign === 'right' ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))',
+                                                color: 'hsl(var(--color-text-primary))', cursor: 'pointer', display: 'flex', justifyContent: 'center',
+                                                alignItems: 'center', height: '100%'
+                                            }}
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="2" /><rect x="11" y="11" width="10" height="2" /><rect x="7" y="17" width="14" height="2" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -221,6 +379,8 @@ export function PropertiesPanel() {
                             />
                         </div>
                     )}
+
+
 
                     {shape.type === 'text' && (
                         <div>
@@ -261,9 +421,20 @@ export function PropertiesPanel() {
                                 onChange={(e) => handleChange('opacity', Number(e.target.value) / 100)}
                                 style={{ flex: 1 }}
                             />
-                            <div style={{ width: '40px' }}>
-                                <LabelInput label="%" value={Math.round((shape.opacity ?? 1) * 100)} onChange={(v) => handleChange('opacity', Number(v) / 100)} />
+                            <div style={{ width: '52px' }}>
+                                <LabelInput label="%" value={Math.round((shape.opacity ?? 1) * 100)} onChange={(v) => handleChange('opacity', Number(v) / 100)} className="no-spin" />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Arrange */}
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                        <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '8px' }}>Arrange</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button title="Bring to Front" onClick={() => handleReorder('front')} style={buttonStyle}>Front</button>
+                            <button title="Bring Forward" onClick={() => handleReorder('forward')} style={buttonStyle}>Fwd</button>
+                            <button title="Send Backward" onClick={() => handleReorder('backward')} style={buttonStyle}>Back</button>
+                            <button title="Send to Back" onClick={() => handleReorder('back')} style={buttonStyle}>Btm</button>
                         </div>
                     </div>
 
@@ -276,6 +447,12 @@ export function PropertiesPanel() {
                     )}
                 </div>
 
+
+
+                {/* Template Option */}
+                {shape.type === 'artboard' && <TemplateProperties shape={shape} onChange={handleChange} onAddTemplate={addTemplate} buttonStyle={buttonStyle} />}
+
+
                 {/* Export */}
                 <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
                     <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export</h3>
@@ -285,16 +462,7 @@ export function PropertiesPanel() {
                     </div>
                 </div>
 
-                {/* Arrange */}
-                <div style={{ marginTop: 'var(--space-2)' }}>
-                    <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '8px' }}>Arrange</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button title="Bring to Front" onClick={() => handleReorder('front')} style={buttonStyle}>Front</button>
-                        <button title="Bring Forward" onClick={() => handleReorder('forward')} style={buttonStyle}>Fwd</button>
-                        <button title="Send Backward" onClick={() => handleReorder('backward')} style={buttonStyle}>Back</button>
-                        <button title="Send to Back" onClick={() => handleReorder('back')} style={buttonStyle}>Btm</button>
-                    </div>
-                </div>
+
             </div>
         </div >
     );
@@ -308,14 +476,16 @@ const buttonStyle = {
     color: "hsl(var(--color-text-primary))",
     cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "12px"
+    fontSize: "12px",
+    boxSizing: "border-box" as const
 };
 
-function LabelInput({ label, value, onChange }: { label: string, value: number, onChange: (val: string) => void }) {
+function LabelInput({ label, value, onChange, className }: { label: string, value: number, onChange: (val: string) => void, className?: string }) {
     return (
         <label style={{ display: 'flex', alignItems: 'center', background: 'hsl(var(--color-bg-app))', border: '1px solid hsl(var(--color-border))', borderRadius: '4px', overflow: 'hidden' }}>
             <span style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', padding: '0 4px', borderRight: '1px solid hsl(var(--color-border))', minWidth: '16px', textAlign: 'center' }}>{label}</span>
             <input
+                className={className}
                 type="number"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
@@ -447,6 +617,118 @@ function ColorInput({ value, onChange, isOpen, onToggle }: { value: string, onCh
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function SelectInput({ label, value, onChange, options }: { label: string, value: string, onChange: (val: string) => void, options: { value: string, label: string }[] }) {
+    return (
+        <label style={{ position: 'relative', display: 'flex', alignItems: 'center', background: 'hsl(var(--color-bg-app))', border: '1px solid hsl(var(--color-border))', borderRadius: '4px', overflow: 'hidden' }}>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                style={{
+                    border: 'none', background: 'transparent', width: '100%', padding: '6px 8px',
+                    fontSize: '12px', color: 'hsl(var(--color-text-primary))', outline: 'none',
+                    appearance: 'none', cursor: 'pointer',
+                    paddingRight: '24px' // Space for chevron
+                }}
+            >
+                <option value="">{label}</option>
+                {options.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+            </select>
+            <div style={{ pointerEvents: 'none', color: 'hsl(var(--color-text-muted))', position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex' }}>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor"><path d="M0 0.5L5 5.5L10 0.5H0Z" /></svg>
+            </div>
+        </label>
+    );
+}
+
+import { generatePNGDataURL } from "@/utils/exportUtils";
+
+function TemplateProperties({ shape, onChange, onAddTemplate, buttonStyle }: { shape: any, onChange: any, onAddTemplate: (t: any) => void, buttonStyle: any }) {
+    const [isHovered, setIsHovered] = useState(false);
+    const isDisabled = !shape.isTemplate && (!shape.templatePlatform || !shape.templateBusiness);
+    const isActive = shape.isTemplate;
+
+    const handleAddTemplate = async () => {
+        if (isDisabled) return;
+
+        // Toggle state
+        const newIsTemplate = !shape.isTemplate;
+        onChange('isTemplate', newIsTemplate);
+
+        if (newIsTemplate) {
+            // Save as template
+            const thumbnail = await generatePNGDataURL([shape]);
+
+            // Deep clone shape for template storage
+            const templateShape = JSON.parse(JSON.stringify(shape));
+
+            onAddTemplate({
+                id: crypto.randomUUID(),
+                name: shape.name || 'Untitled Artboard',
+                thumbnail,
+                shapes: [templateShape], // Store the artboard itself as the root
+                platform: shape.templatePlatform,
+                business: shape.templateBusiness,
+                width: shape.width,
+                height: shape.height
+            });
+        }
+    };
+
+    return (
+        <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
+            <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Template</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <SelectInput
+                        label="Platform"
+                        value={shape.templatePlatform || ''}
+                        onChange={(v) => onChange('templatePlatform', v)}
+                        options={[
+                            { value: 'LinkedIn', label: 'LinkedIn' },
+                            { value: 'Instagram', label: 'Instagram' },
+                            { value: 'Facebook', label: 'Facebook' },
+                            { value: 'TikTok', label: 'TikTok' },
+                            { value: 'YouTube', label: 'YouTube' }
+                        ]}
+                    />
+                    <SelectInput
+                        label="Business"
+                        value={shape.templateBusiness || ''}
+                        onChange={(v) => onChange('templateBusiness', v)}
+                        options={[
+                            { value: 'Corporate', label: 'Corporate' },
+                            { value: 'Digital', label: 'Digital' },
+                            { value: 'NBG Pay', label: 'NBG Pay' },
+                            { value: 'Next', label: 'Next' }
+                        ]}
+                    />
+                </div>
+
+                <button
+                    onClick={handleAddTemplate}
+                    disabled={isDisabled}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    style={{
+                        ...buttonStyle,
+                        width: '100%',
+                        backgroundColor: (isActive || (isHovered && !isDisabled)) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-bg-app))',
+                        color: (isActive || (isHovered && !isDisabled)) ? 'white' : 'hsl(var(--color-text-primary))',
+                        borderColor: (isActive || (isHovered && !isDisabled)) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
+                        opacity: isDisabled ? 0.5 : 1,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    Add as Template
+                </button>
+            </div>
         </div>
     );
 }

@@ -22,24 +22,68 @@ const RATIOS = [
 ];
 
 export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
-    const { addShape, offset, setOffset } = useCanvasStore();
+    const { addShape, offset, setOffset, setZoom, shapes } = useCanvasStore();
     const [selectedPlatform, setSelectedPlatform] = useState('Instagram');
     const [selectedRatio, setSelectedRatio] = useState(RATIOS[0]);
 
     if (!isOpen) return null;
 
     const handleCreate = () => {
+        // Find the last created artboard to position next to
+        const existingArtboards = shapes.filter(s => s.type === 'artboard');
+        const lastArtboard = existingArtboards.length > 0 ? existingArtboards[existingArtboards.length - 1] : null;
+
+        let x, y;
+
+        if (lastArtboard) {
+            // Place 40px to the right, aligned at top
+            x = lastArtboard.x + lastArtboard.width + 40;
+            y = lastArtboard.y;
+        } else {
+            // Default: Place near center of view
+            x = -offset.x + 100;
+            y = -offset.y + 100;
+        }
+
         const newArtboard: Shape = {
             id: crypto.randomUUID(),
             type: 'artboard',
-            x: -offset.x + 100, // Place near center of view approx
-            y: -offset.y + 100,
+            x,
+            y,
             width: selectedRatio.width,
             height: selectedRatio.height,
             fill: '#ffffff',
             children: []
         };
         addShape(newArtboard);
+
+        // Auto-zoom logic
+        // Layout dimensions from AppShell.module.css
+        const leftSidebarWidth = 240;
+        const rightSidebarWidth = 280;
+        const headerHeight = 48;
+
+        const viewportW = window.innerWidth - leftSidebarWidth - rightSidebarWidth;
+        const viewportH = window.innerHeight - headerHeight;
+        const padding = 60;
+
+        // Calculate scale to fit
+        const scaleX = (viewportW - padding * 2) / newArtboard.width;
+        const scaleY = (viewportH - padding * 2) / newArtboard.height;
+        const newZoom = Math.min(scaleX, scaleY, 2); // Cap max zoom
+
+        // Calculate offset to center
+        // The shape center in world coordinates
+        const centerX = newArtboard.x + newArtboard.width / 2;
+        const centerY = newArtboard.y + newArtboard.height / 2;
+
+        // New offset calculation
+        const newOffsetX = (viewportW / 2) - (centerX * newZoom);
+        const newOffsetY = (viewportH / 2) - (centerY * newZoom);
+
+        setZoom(newZoom);
+        setOffset({ x: newOffsetX, y: newOffsetY });
+
         onClose();
     };
 
@@ -66,7 +110,7 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                 padding: 'var(--space-6)',
                 boxShadow: 'var(--shadow-md)',
             }} onClick={e => e.stopPropagation()}>
-                
+
                 {/* Header */}
                 <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-6)' }}>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Create Artboard</h2>
@@ -95,9 +139,9 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                 </div>
 
                 {/* Ratios Grid */}
-                <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
                     gap: 'var(--space-4)',
                     marginBottom: 'var(--space-6)'
                 }}>
@@ -129,13 +173,13 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                <div style={{ 
-                                    width: '64px', 
-                                    height: '64px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                                <div style={{
+                                    width: '64px',
+                                    height: '64px',
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     justifyContent: 'center',
-                                    marginBottom: 'var(--space-2)' 
+                                    marginBottom: 'var(--space-2)'
                                 }}>
                                     <div style={{
                                         width: `${w}px`,
@@ -154,10 +198,10 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
 
                 {/* Footer / Create Button */}
                 <div className="flex justify-between items-center">
-                   <div style={{ fontSize: 'var(--text-sm)', color: 'hsl(var(--color-text-muted))' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'hsl(var(--color-text-muted))' }}>
                         Selected: {selectedRatio.width} x {selectedRatio.height} px
-                   </div>
-                   <button 
+                    </div>
+                    <button
                         onClick={handleCreate}
                         style={{
                             backgroundColor: 'hsl(var(--color-accent))',
@@ -166,9 +210,9 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                             borderRadius: 'var(--radius-md)',
                             fontWeight: 500
                         }}
-                   >
-                    Create Artboard
-                   </button>
+                    >
+                        Create Artboard
+                    </button>
                 </div>
 
             </div>
