@@ -2,16 +2,19 @@
 
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useCanvasStore } from '@/store/canvasStore';
+import { ASSET_LIBRARY } from '@/data/assets';
 
 interface AssetsModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-const CATEGORIES = ['Logos', 'Shapes', 'Icons'];
+const CATEGORIES = Object.keys(ASSET_LIBRARY);
 
 export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
-    const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
+    const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0] || 'Logos');
+    const { addShape, offset, zoom } = useCanvasStore();
 
     if (!isOpen) return null;
 
@@ -66,17 +69,39 @@ export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
                     ))}
                 </div>
 
-                {/* Placeholders Grid */}
+                {/* Assets Grid */}
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(4, 1fr)',
                     gap: 'var(--space-4)',
-                    marginBottom: 'var(--space-6)'
+                    marginBottom: 'var(--space-6)',
+                    maxHeight: '60vh',
+                    overflowY: 'auto'
                 }}>
-                    {Array.from({ length: 8 }).map((_, i) => (
+                    {(ASSET_LIBRARY[selectedCategory] || []).map((asset) => (
                         <div
-                            key={i}
+                            key={asset.id}
+                            onClick={() => {
+                                // Default drop in center of current view
+                                // Using offset and zoom to calculate a rough center
+                                // Assuming typical viewport is around 1000x800, center is ~500x400
+                                const targetX = (500 - offset.x) / zoom;
+                                const targetY = (400 - offset.y) / zoom;
+
+                                addShape({
+                                    id: crypto.randomUUID(),
+                                    type: 'svg',
+                                    x: targetX,
+                                    y: targetY,
+                                    width: 200,
+                                    height: 200,
+                                    fill: '#000000', // Default fill that can be changed
+                                    svgContent: asset.content
+                                });
+                                onClose();
+                            }}
                             style={{
+                                position: 'relative',
                                 aspectRatio: '1/1',
                                 border: '1px solid hsl(var(--color-border))',
                                 borderRadius: 'var(--radius-md)',
@@ -84,11 +109,39 @@ export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: 'hsl(var(--color-text-muted))',
-                                fontSize: 'var(--text-xs)'
+                                cursor: 'pointer',
+                                padding: 'var(--space-2)',
+                                transition: 'all 0.2s',
                             }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'hsl(var(--color-accent))';
+                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-panel))';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'hsl(var(--color-border))';
+                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-app))';
+                            }}
+                            title={asset.name}
                         >
-                            Placeholder
+                            <div style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                fontSize: '0.65rem',
+                                fontWeight: 600,
+                                backgroundColor: 'hsl(var(--color-bg-panel))',
+                                border: '1px solid hsl(var(--color-border))',
+                                color: 'hsl(var(--color-text-secondary))',
+                                padding: '2px 4px',
+                                borderRadius: '4px',
+                                opacity: 0.8
+                            }}>
+                                {asset.lang}
+                            </div>
+                            <div 
+                                style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                dangerouslySetInnerHTML={{ __html: asset.content.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid meet">') }}
+                            />
                         </div>
                     ))}
                 </div>

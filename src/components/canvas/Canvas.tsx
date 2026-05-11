@@ -14,19 +14,35 @@ export function Canvas() {
 
     // Interaction State
     const [isDragging, setIsDragging] = useState(false);
+    const [isPanning, setIsPanning] = useState(false); // New Panning State
     const [isResizing, setIsResizing] = useState<string | null>(null); // 'nw', 'ne', 'sw', 'se'
     const [isRotating, setIsRotating] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null); // Track which shape is being edited inline
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 }); // World coords
+    const [panStart, setPanStart] = useState({ x: 0, y: 0 }); // Screen coords for panning
     const [initialShapePositions, setInitialShapePositions] = useState<{ [id: string]: Shape }>({});
 
     // Marquee Selection State
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 }); // World coords
     const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 }); // World coords
+    const [isAltPressed, setIsAltPressed] = useState(false); // Track Alt key for Zoom tool
+
+    // Cursor Logic
+    const getCursor = () => {
+        if (activeTool === 'hand') return isPanning ? 'grabbing' : 'grab';
+        if (activeTool === 'zoom') return isAltPressed ? 'zoom-out' : 'zoom-in';
+        if (activeTool === 'zoom-out') return 'zoom-out';
+        if (activeTool === 'text') return 'text';
+        if (activeTool !== 'select') return 'crosshair';
+        if (isRotating) return 'grabbing';
+        return 'default';
+    };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Alt') setIsAltPressed(true);
+
             // If editing text inline, do not process global shortcuts
             if (editingId) return;
 
@@ -83,8 +99,16 @@ export function Canvas() {
             }
         };
 
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Alt') setIsAltPressed(false);
+        };
+
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
     }, [selectedIds, removeShape, setSelectedIds, editingId, redo, undo, copy, paste, group, ungroup, toggleSnapToGrid]);
 
     // Wheel handling for Pan and Zoom
@@ -114,6 +138,12 @@ export function Canvas() {
     };
 
     const handleShapeMouseDown = (e: React.MouseEvent, id: string) => {
+        // If Hand or Zoom tool is active, handle global logic instead of shape logic
+        if (activeTool === 'hand' || activeTool === 'zoom') {
+            // Let it bubble to handleMouseDown
+            return;
+        }
+
         // If we are currently editing this shape, do nothing (let text interaction happen)
         if (editingId === id) {
             e.stopPropagation();
@@ -162,6 +192,8 @@ export function Canvas() {
 
     const handleShapeDoubleClick = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        if (activeTool === 'hand' || activeTool === 'zoom') return; // Ignore if tools active
+
         const shape = findShape(shapes, id);
         if (shape && shape.type === 'text') {
             setEditingId(id);
@@ -190,6 +222,35 @@ export function Canvas() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const { x, y } = getMousePosition(e);
+
+        if (activeTool === 'hand') {
+            setIsPanning(true);
+            setPanStart({ x: e.clientX, y: e.clientY });
+            // Save initial offset? We update offset relative to delta
+            // Actually it's cleaner to just use delta from previous frame if using requestAnimationFrame, 
+            // but for React event loop, just storing start Mouse and start Offset is easier.
+            // But we didn't store start Offset. Let's rely on panStart and current Mouse to calc delta 
+            // and add to INITIAL offset. 
+            // Simpler: Store previous mouse position and update offset incrementally?
+            // React state updates might be batched. 
+            // Let's store the Start Offset in ref or state?
+            // "panStart" above is mouse. We need "offsetStart".
+            // Since we didn't add offsetStart state, we can use a ref or just update incrementally in mouseMove
+            // by tracking "lastMousePosition".
+            // Let's use setPanStart as "Last Mouse Position".
+            return;
+        }
+
+        if (activeTool === 'zoom') {
+            const factor = e.altKey ? 0.8 : 1.25;
+            setZoom((prev) => prev * factor);
+            return;
+        }
+
+        if (activeTool === 'zoom-out') {
+            setZoom((prev) => prev * 0.8);
+            return;
+        }
 
         if (activeTool === 'select') {
             // Marquee selection start
@@ -227,22 +288,24 @@ export function Canvas() {
             return;
         }
 
-        const newShape: Shape = {
-            id: crypto.randomUUID(),
-            type: activeTool,
-            x: snapValue(x),
-            y: snapValue(y),
-            width: 0,
-            height: 0,
-            fill: activeTool === 'line' ? 'transparent' : '#F5F8F6',
-            stroke: activeTool === 'line' ? '#000000' : undefined,
-            strokeWidth: activeTool === 'line' ? 2 : undefined,
-            x2: snapValue(x),
-            y2: snapValue(y),
-            rotation: 0
-        };
-        saveSnapshot(); // Save before create intent
-        setDrawingShape(newShape);
+        if (activeTool === 'rectangle' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'artboard') {
+            const newShape: Shape = {
+                id: crypto.randomUUID(),
+                type: activeTool,
+                x: snapValue(x),
+                y: snapValue(y),
+                width: 0,
+                height: 0,
+                fill: activeTool === 'line' ? 'transparent' : '#F5F8F6',
+                stroke: activeTool === 'line' ? '#000000' : undefined,
+                strokeWidth: activeTool === 'line' ? 2 : undefined,
+                x2: snapValue(x),
+                y2: snapValue(y),
+                rotation: 0
+            };
+            saveSnapshot(); // Save before create intent
+            setDrawingShape(newShape);
+        }
     };
 
     const rotatePoint = (px: number, py: number, cx: number, cy: number, angleDeg: number) => {
@@ -256,6 +319,14 @@ export function Canvas() {
 
     const handleMouseMove = (e: React.MouseEvent) => {
         const { x, y } = getMousePosition(e);
+
+        if (isPanning) {
+            const dx = e.clientX - panStart.x;
+            const dy = e.clientY - panStart.y;
+            setOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+            setPanStart({ x: e.clientX, y: e.clientY }); // Update last position
+            return;
+        }
 
         if (activeTool === 'select') {
             if (isSelecting) {
@@ -678,6 +749,10 @@ export function Canvas() {
             }
         }
 
+        if (isPanning) {
+            setIsPanning(false);
+        }
+
         setIsDragging(false);
         setIsResizing(null);
         setIsRotating(false);
@@ -926,6 +1001,20 @@ export function Canvas() {
                             style={{ pointerEvents: isChild ? 'none' : 'auto' }}
                         />
                     )}
+                    {shape.type === 'svg' && shape.svgContent && (
+                        <g
+                            transform={`translate(${shape.x}, ${shape.y})`}
+                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto', color: shape.fill }}
+                        >
+                            <foreignObject width={shape.width} height={shape.height}>
+                                <div 
+                                    style={{ width: '100%', height: '100%', color: shape.fill }} 
+                                    dangerouslySetInnerHTML={{ __html: shape.svgContent.replace(/fill="[^"]*"/g, 'fill="currentColor"') }}
+                                />
+                            </foreignObject>
+                        </g>
+                    )}
                     {shape.type === 'video' && (
                         <foreignObject
                             x={shape.x}
@@ -1034,7 +1123,7 @@ export function Canvas() {
                 height: '100%',
                 overflow: 'hidden',
                 position: 'relative',
-                cursor: activeTool === 'select' ? 'default' : 'crosshair',
+                cursor: getCursor(),
                 userSelect: 'none'
             }}
             onWheel={handleWheel}

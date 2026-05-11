@@ -6,7 +6,7 @@ import { ArtboardModal } from "@/components/modals/ArtboardModal";
 import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { AssetsModal } from "@/components/modals/AssetsModal";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { ArrowLeft, ArrowRight, FolderOpen, Save, MousePointer2, Type, Square, Image as ImageIcon, Layout, LayoutTemplate, Box } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FolderOpen, Save, MousePointer2, Hand, ZoomIn, ZoomOut, Search, Type, Square, Circle, Minus, Image as ImageIcon, Video, Layout, LayoutTemplate, Box } from 'lucide-react';
 import styles from './Toolbar.module.css';
 
 export function Toolbar() {
@@ -162,6 +162,23 @@ export function Toolbar() {
                 <button className={styles.toolButton} data-active={activeTool === 'select'} onClick={() => setActiveTool('select')}>
                     <MousePointer2 size={16} /> Select
                 </button>
+                <button className={styles.toolButton} data-active={activeTool === 'hand'} onClick={() => setActiveTool('hand')}>
+                    <Hand size={16} /> Move
+                </button>
+
+                <Dropdown
+                    label={<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Search size={16} /> Zoom</div>}
+                    isActive={['zoom', 'zoom-out'].includes(activeTool)}
+                    className={styles.toolButton}
+                >
+                    <div onClick={() => setActiveTool('zoom')} className={styles.dropdownItem} data-active={activeTool === 'zoom'}>
+                        <ZoomIn size={14} /> Zoom in
+                    </div>
+                    <div onClick={() => setActiveTool('zoom-out')} className={styles.dropdownItem} data-active={activeTool === 'zoom-out'}>
+                        <ZoomOut size={14} /> Zoom out
+                    </div>
+                </Dropdown>
+
                 <button className={styles.toolButton} data-active={activeTool === 'text'} onClick={() => setActiveTool('text')}>
                     <Type size={16} /> Text
                 </button>
@@ -171,27 +188,37 @@ export function Toolbar() {
                     isActive={['rectangle', 'ellipse', 'line'].includes(activeTool)}
                     className={styles.toolButton}
                 >
-                    <div onClick={() => setActiveTool('rectangle')} style={{ cursor: 'pointer', padding: "4px 8px", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)", backgroundColor: activeTool === 'rectangle' ? "hsl(var(--color-accent))" : "transparent", color: activeTool === 'rectangle' ? "hsl(var(--color-accent-fg))" : "inherit", border: 'none', textAlign: 'left', width: '100%' }}>Rectangle</div>
-                    <div onClick={() => setActiveTool('ellipse')} style={{ cursor: 'pointer', padding: "4px 8px", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)", backgroundColor: activeTool === 'ellipse' ? "hsl(var(--color-accent))" : "transparent", color: activeTool === 'ellipse' ? "hsl(var(--color-accent-fg))" : "inherit", border: 'none', textAlign: 'left', width: '100%' }}>Ellipse</div>
-                    <div onClick={() => setActiveTool('line')} style={{ cursor: 'pointer', padding: "4px 8px", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)", backgroundColor: activeTool === 'line' ? "hsl(var(--color-accent))" : "transparent", color: activeTool === 'line' ? "hsl(var(--color-accent-fg))" : "inherit", border: 'none', textAlign: 'left', width: '100%' }}>Line</div>
+                    <div onClick={() => setActiveTool('rectangle')} className={styles.dropdownItem} data-active={activeTool === 'rectangle'}>
+                        <Square size={14} /> Rectangle
+                    </div>
+                    <div onClick={() => setActiveTool('ellipse')} className={styles.dropdownItem} data-active={activeTool === 'ellipse'}>
+                        <Circle size={14} /> Ellipse
+                    </div>
+                    <div onClick={() => setActiveTool('line')} className={styles.dropdownItem} data-active={activeTool === 'line'}>
+                        <Minus size={14} /> Line
+                    </div>
                 </Dropdown>
 
                 <Dropdown
                     label={<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImageIcon size={16} /> Media</div>}
                     className={styles.toolButton}
                 >
-                    <div onClick={() => handleMediaClick('image')} style={{ padding: '8px', cursor: 'pointer', fontSize: "var(--text-sm)" }}>Image</div>
-                    <div onClick={() => handleMediaClick('video')} style={{ padding: '8px', cursor: 'pointer', fontSize: "var(--text-sm)" }}>Video</div>
+                    <div onClick={() => handleMediaClick('image')} className={styles.dropdownItem}>
+                        <ImageIcon size={14} /> Image
+                    </div>
+                    <div onClick={() => handleMediaClick('video')} className={styles.dropdownItem}>
+                        <Video size={14} /> Video
+                    </div>
                 </Dropdown>
 
-                <button className={styles.toolButton} data-active={activeTool === 'artboard'} onClick={() => setShowArtboardModal(true)}>
-                    <Layout size={16} /> Artboard
-                </button>
                 <button className={styles.toolButton} onClick={() => setShowTemplatesModal(true)}>
                     <LayoutTemplate size={16} /> Templates
                 </button>
                 <button className={styles.toolButton} onClick={() => setShowAssetsModal(true)}>
                     <Box size={16} /> Assets
+                </button>
+                <button className={styles.toolButton} data-active={activeTool === 'artboard'} onClick={() => setShowArtboardModal(true)}>
+                    <Layout size={16} /> Add Artboard
                 </button>
             </div>
 

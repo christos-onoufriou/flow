@@ -241,7 +241,7 @@ export function LayersPanel() {
                         <span style={{ opacity: 0.7 }}>
                             {shape.type === 'rectangle' ? '⬜' : shape.type === 'ellipse' ? '⭕' : shape.type === 'artboard' ? '🎨' : shape.type === 'text' ? 'T' : '➖'}
                         </span>
-                        <span style={{ textTransform: 'capitalize' }}>{shape.type}</span>
+                        <span style={{ textTransform: shape.name ? 'none' : 'capitalize' }}>{shape.name || shape.type}</span>
                     </div>
                     {/* ... (delete button etc) */}
                 </div>

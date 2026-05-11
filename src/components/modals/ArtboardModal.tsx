@@ -9,22 +9,84 @@ interface ArtboardModalProps {
     onClose: () => void;
 }
 
-const PLATFORMS = ['Instagram', 'LinkedIn', 'Facebook', 'TikTok', 'YouTube'];
+const PLATFORM_SIZES: Record<string, { label: string; width: number; height: number; description?: string }[]> = {
+    Instagram: [
+        { label: 'Feed (Standard)', width: 1080, height: 1440, description: '3:4 ratio' },
+        { label: 'Feed (Vertical)', width: 1080, height: 1350, description: '4:5 ratio' },
+        { label: 'Feed (Square)', width: 1080, height: 1080, description: '1:1 ratio' },
+        { label: 'Story', width: 1080, height: 1920, description: '9:16 ratio' },
+        { label: 'Reel', width: 1080, height: 1920, description: '9:16 ratio' },
+    ],
+    Facebook: [
+        { label: 'Feed (Square)', width: 1080, height: 1080, description: '1:1 ratio' },
+        { label: 'Feed (Vertical)', width: 1080, height: 1350, description: '4:5 ratio' },
+        { label: 'Shared Link', width: 1200, height: 630, description: '1.91:1 ratio' },
+        { label: 'Story', width: 1080, height: 1920, description: '9:16 ratio' },
+        { label: 'Reel', width: 1080, height: 1920, description: '9:16 ratio' },
+    ],
+    TikTok: [
+        { label: 'In-Feed Video', width: 1080, height: 1920, description: '9:16 ratio' },
+        { label: 'Photo Carousel', width: 1080, height: 1920, description: '9:16 ratio' },
+        { label: 'Story', width: 1080, height: 1920, description: '9:16 ratio' },
+    ],
+    LinkedIn: [
+        { label: 'Feed (Square)', width: 1200, height: 1200, description: '1:1 ratio' },
+        { label: 'Feed (Vertical)', width: 1080, height: 1350, description: '4:5 ratio' },
+        { label: 'Shared Link', width: 1200, height: 627 },
+        { label: 'Video (Desktop)', width: 1920, height: 1080, description: '16:9 ratio' },
+        { label: 'Video (Mobile)', width: 1080, height: 1350, description: '4:5 ratio' },
+    ],
+    YouTube: [
+        { label: 'Standard Video', width: 1920, height: 1080, description: '16:9 ratio' },
+        { label: '1440p', width: 2560, height: 1440, description: '16:9 ratio' },
+        { label: '4K', width: 3840, height: 2160, description: '16:9 ratio' },
+        { label: 'YouTube Shorts', width: 1080, height: 1920, description: '9:16 ratio' }
+    ]
+};
+const PLATFORMS = ['LinkedIn', 'YouTube', 'Facebook', 'Instagram', 'TikTok'];
 
-const RATIOS = [
-    { label: '1:1', width: 1080, height: 1080 },
-    { label: '3:4', width: 1080, height: 1440 },
-    { label: '4:3', width: 1440, height: 1080 },
-    { label: '3:2', width: 1440, height: 960 },
-    { label: '2:3', width: 960, height: 1440 },
-    { label: '9:16', width: 1080, height: 1920 },
-    { label: '16:9', width: 1920, height: 1080 },
-];
+function getSafeAreaGuides(platform: string, label: string, width: number, height: number): Shape[] {
+    const guides: Shape[] = [];
+    const createGuide = (name: string, x: number, y: number, w: number, h: number, strokeColor: string): Shape => ({
+        id: crypto.randomUUID(),
+        type: 'rectangle',
+        x, y, width: w, height: h,
+        fill: 'transparent',
+        stroke: strokeColor,
+        strokeWidth: 2,
+        name,
+        locked: true,
+        opacity: 0.8
+    });
+
+    if (platform === 'Instagram' && (label.includes('Story') || label.includes('Reel'))) {
+        guides.push(createGuide('Safe Zone (IG)', 65, 250, 950, 1420, '#00ff00'));
+    } else if (platform === 'Facebook') {
+        if (label.includes('Story')) {
+            guides.push(createGuide('Safe Zone (FB Story)', 65, 250, 950, 1420, '#00ff00'));
+        } else if (label.includes('Reel')) {
+            guides.push(createGuide('Safe Zone (FB Reel)', 65, 270, 950, 980, '#00ff00'));
+            guides.push(createGuide('Meta Center-Square', 0, 420, 1080, 1080, '#00aaff'));
+        }
+    } else if (platform === 'TikTok' && (label.includes('In-Feed') || label.includes('Carousel') || label.includes('Story'))) {
+        guides.push(createGuide('Safe Zone (TikTok)', 60, 108, 900, 1492, '#00ff00'));
+    } else if (platform === 'YouTube' && label.includes('Short')) {
+        guides.push(createGuide('Safe Zone (YT Shorts)', 0, 150, 930, 1320, '#00ff00'));
+    } else if (platform === 'LinkedIn') {
+        if (label.includes('Vertical') && width === 1080 && height === 1350) {
+            guides.push(createGuide('Safe Zone (Vertical)', 100, 100, 880, 1150, '#00ff00'));
+        } else if (label.includes('Banner') && width === 1584 && height === 396) {
+            guides.push(createGuide('Safe Zone (Upper Right)', 792, 0, 792, 198, '#00ff00'));
+        }
+    }
+
+    return guides;
+}
 
 export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
     const { addShape, offset, setOffset, setZoom, shapes } = useCanvasStore();
-    const [selectedPlatform, setSelectedPlatform] = useState('Instagram');
-    const [selectedRatio, setSelectedRatio] = useState(RATIOS[0]);
+    const [selectedPlatform, setSelectedPlatform] = useState(PLATFORMS[0]);
+    const [selectedRatio, setSelectedRatio] = useState(PLATFORM_SIZES[PLATFORMS[0]][0]);
 
     if (!isOpen) return null;
 
@@ -53,7 +115,7 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
             width: selectedRatio.width,
             height: selectedRatio.height,
             fill: '#ffffff',
-            children: []
+            children: getSafeAreaGuides(selectedPlatform, selectedRatio.label, selectedRatio.width, selectedRatio.height)
         };
         addShape(newArtboard);
 
@@ -124,7 +186,10 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                     {PLATFORMS.map(platform => (
                         <button
                             key={platform}
-                            onClick={() => setSelectedPlatform(platform)}
+                            onClick={() => {
+                                setSelectedPlatform(platform);
+                                setSelectedRatio(PLATFORM_SIZES[platform][0]);
+                            }}
                             style={{
                                 padding: 'var(--space-2) var(--space-4)',
                                 borderBottom: selectedPlatform === platform ? '2px solid hsl(var(--color-accent))' : '2px solid transparent',
@@ -138,15 +203,20 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                     ))}
                 </div>
 
+
+
                 {/* Ratios Grid */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
                     gap: 'var(--space-4)',
-                    marginBottom: 'var(--space-6)'
+                    marginBottom: 'var(--space-6)',
+                    maxHeight: '40vh',
+                    overflowY: 'auto',
+                    paddingRight: 'var(--space-2)'
                 }}>
-                    {RATIOS.map(ratio => {
-                        const isSelected = selectedRatio.label === ratio.label;
+                    {PLATFORM_SIZES[selectedPlatform].map(ratio => {
+                        const isSelected = selectedRatio.label === ratio.label && selectedRatio.width === ratio.width && selectedRatio.height === ratio.height;
                         // Calculate visual aspect ratio for the preview box
                         const maxDim = 60;
                         const ar = ratio.width / ratio.height;
@@ -160,7 +230,7 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
 
                         return (
                             <button
-                                key={ratio.label}
+                                key={`${ratio.label}-${ratio.width}x${ratio.height}`}
                                 onClick={() => setSelectedRatio(ratio)}
                                 style={{
                                     display: 'flex',
@@ -189,7 +259,10 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
                                         opacity: 0.8
                                     }} />
                                 </div>
-                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>{ratio.label}</span>
+                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, textAlign: 'center', lineHeight: 1.2, marginBottom: '4px' }}>{ratio.label}</span>
+                                {ratio.description && (
+                                    <span style={{ fontSize: '0.7rem', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>{ratio.description}</span>
+                                )}
                                 <span style={{ fontSize: '0.7rem', color: 'hsl(var(--color-text-muted))' }}>{ratio.width}x{ratio.height}</span>
                             </button>
                         )

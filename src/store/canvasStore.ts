@@ -2,7 +2,9 @@ import { create } from 'zustand';
 
 export interface Shape {
     id: string;
-    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard' | 'image' | 'video';
+    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard' | 'image' | 'video' | 'svg';
+    name?: string;
+    locked?: boolean;
     x: number;
     y: number;
     width: number;
@@ -28,13 +30,14 @@ export interface Shape {
     isTemplate?: boolean;
     templatePlatform?: string;
     templateBusiness?: string;
+    svgContent?: string;
 }
 
 interface CanvasState {
     offset: { x: number; y: number };
     zoom: number;
     shapes: Shape[];
-    activeTool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard';
+    activeTool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard' | 'hand' | 'zoom' | 'zoom-out';
     selectedIds: string[];
     past: Shape[][];
     future: Shape[][];
@@ -47,7 +50,7 @@ interface CanvasState {
     addShape: (shape: Shape) => void;
     updateShape: (id: string, updates: Partial<Shape>) => void;
     removeShape: (id: string) => void;
-    setActiveTool: (tool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard') => void;
+    setActiveTool: (tool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard' | 'hand' | 'zoom' | 'zoom-out') => void;
     setSelectedIds: (ids: string[]) => void;
     reorderShape: (id: string, action: 'front' | 'back' | 'forward' | 'backward') => void;
     saveSnapshot: () => void;

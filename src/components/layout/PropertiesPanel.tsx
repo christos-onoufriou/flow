@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import { Search, Link2, Unlink2 } from 'lucide-react';
 
 import { useCanvasStore } from "@/store/canvasStore";
 import { exportSelectionToSVG, exportSelectionToPNG } from "@/utils/exportUtils";
@@ -24,20 +25,38 @@ export function PropertiesPanel() {
 }
 
 function PropertiesPanelContent() {
-    const { selectedIds, shapes, updateShape, reorderShape, saveSnapshot, alignShapes, distributeShapes, addTemplate } = useCanvasStore();
+    const {
+        selectedIds, shapes, updateShape, reorderShape, saveSnapshot,
+        alignShapes, distributeShapes, addTemplate,
+        offset, zoom, setOffset, setZoom
+    } = useCanvasStore();
 
     const [activePopup, setActivePopup] = useState<string | null>(null);
-    // ... (lines 31-447 unchanged effectively, just context)
+
+    // ...
 
     if (selectedIds.length === 0) {
         return (
             <div style={{ padding: "var(--space-4)" }}>
                 <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-4)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Properties</h3>
-                <div style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-secondary))" }}>No selection</div>
-                <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-4)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Properties</h3>
-                <div style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-secondary))", marginBottom: "var(--space-4)" }}>No selection</div>
 
-                <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)" }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Canvas</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                        <LabelInput label="X" value={Math.round(offset.x)} onChange={(v) => setOffset(prev => ({ ...prev, x: Number(v) }))} />
+                        <LabelInput label="Y" value={Math.round(offset.y)} onChange={(v) => setOffset(prev => ({ ...prev, y: Number(v) }))} />
+                    </div>
+                    <div>
+                        <LabelInput
+                            label={<Search size={12} />}
+                            value={Math.round(zoom * 100)}
+                            onChange={(v) => setZoom(Number(v) / 100)}
+                            suffix="%"
+                        />
+                    </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
                     <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Canvas</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <button onClick={() => exportSelectionToSVG(shapes, 'canvas.svg')} style={buttonStyle}>SVG</button>
@@ -145,7 +164,7 @@ function PropertiesPanelContent() {
                             <LabelInput label="X" value={Math.round(shape.x)} onChange={(v) => handleChange('x', Number(v))} />
                             <LabelInput label="Y" value={Math.round(shape.y)} onChange={(v) => handleChange('y', Number(v))} />
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                             <div style={{ flex: 1 }}>
                                 <LabelInput
                                     label="W"
@@ -161,6 +180,24 @@ function PropertiesPanelContent() {
                                     }}
                                 />
                             </div>
+                            <button
+                                onClick={() => handleChange('aspectRatioLocked', !shape.aspectRatioLocked)}
+                                title={shape.aspectRatioLocked ? "Unlock Aspect Ratio" : "Lock Aspect Ratio"}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '4px 2px',
+                                    color: shape.aspectRatioLocked ? 'hsl(var(--color-accent))' : 'hsl(var(--color-text-muted))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >
+                                {shape.aspectRatioLocked ? (
+                                    <Link2 size={12} />
+                                ) : (
+                                    <Unlink2 size={12} />
+                                )}
+                            </button>
                             <div style={{ flex: 1 }}>
                                 <LabelInput
                                     label="H"
@@ -176,27 +213,12 @@ function PropertiesPanelContent() {
                                     }}
                                 />
                             </div>
-                            <button
-                                onClick={() => handleChange('aspectRatioLocked', !shape.aspectRatioLocked)}
-                                title={shape.aspectRatioLocked ? "Unlock Aspect Ratio" : "Lock Aspect Ratio"}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    color: shape.aspectRatioLocked ? 'hsl(var(--color-accent))' : 'hsl(var(--color-text-muted))',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}
-                            >
-                                {shape.aspectRatioLocked ? (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                                ) : (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-                                )}
-                            </button>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                             <LabelInput label="R" value={Math.round(shape.rotation || 0)} onChange={(v) => handleChange('rotation', Number(v))} />
+                            {shape.type === 'rectangle' && (
+                                <LabelInput label="C" value={shape.cornerRadius || 0} onChange={(v) => handleChange('cornerRadius', Number(v))} />
+                            )}
                         </div>
                     </div>
                 )}
@@ -438,13 +460,7 @@ function PropertiesPanelContent() {
                         </div>
                     </div>
 
-                    {shape.type === 'rectangle' && (
-                        <div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                                <LabelInput label="Radius" value={shape.cornerRadius || 0} onChange={(v) => handleChange('cornerRadius', Number(v))} />
-                            </div>
-                        </div>
-                    )}
+
                 </div>
 
 
@@ -480,15 +496,19 @@ const buttonStyle = {
     boxSizing: "border-box" as const
 };
 
-function LabelInput({ label, value, onChange, className }: { label: string, value: number, onChange: (val: string) => void, className?: string }) {
+function LabelInput({ label, value, onChange, className, suffix }: { label: string | React.ReactNode, value: number, onChange: (val: string) => void, className?: string, suffix?: string }) {
     return (
         <label style={{ display: 'flex', alignItems: 'center', background: 'hsl(var(--color-bg-app))', border: '1px solid hsl(var(--color-border))', borderRadius: '4px', overflow: 'hidden' }}>
-            <span style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', padding: '0 4px', borderRight: '1px solid hsl(var(--color-border))', minWidth: '16px', textAlign: 'center' }}>{label}</span>
+            <span style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', padding: '0 4px', borderRight: '1px solid hsl(var(--color-border))', minWidth: '16px', textAlign: 'center', display: 'flex', justifyContent: 'center' }}>{label}</span>
             <input
                 className={className}
-                type="number"
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
+                type="text"
+                value={suffix ? `${value}${suffix}` : value}
+                onChange={(e) => {
+                    let val = e.target.value;
+                    if (suffix) val = val.replace(suffix, '');
+                    onChange(val);
+                }}
                 style={{
                     border: 'none', background: 'transparent', width: '100%', padding: '4px',
                     fontSize: '12px', color: 'hsl(var(--color-text-primary))', outline: 'none'

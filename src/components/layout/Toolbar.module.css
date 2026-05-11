@@ -46,3 +46,29 @@
 .toolButton[data-open="true"] {
     background-color: hsl(var(--color-bg-panel));
 }
+
+.dropdownItem {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    background-color: transparent;
+    color: inherit;
+    border: none;
+    text-align: left;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dropdownItem:hover:not([data-active="true"]) {
+    background-color: transparent;
+    color: #00DEF8;
+}
+
+.dropdownItem[data-active="true"] {
+    background-color: hsl(var(--color-accent));
+    color: hsl(var(--color-accent-fg));
+}
