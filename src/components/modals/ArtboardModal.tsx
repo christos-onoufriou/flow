@@ -110,6 +110,7 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
         const newArtboard: Shape = {
             id: crypto.randomUUID(),
             type: 'artboard',
+            name: `${selectedPlatform} - ${selectedRatio.label}`,
             x,
             y,
             width: selectedRatio.width,
@@ -175,7 +176,7 @@ export function ArtboardModal({ isOpen, onClose }: ArtboardModalProps) {
 
                 {/* Header */}
                 <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-6)' }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Create Artboard</h2>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>SoMe Templates</h2>
                     <button onClick={onClose} style={{ padding: 'var(--space-1)' }}>
                         <X size={20} />
                     </button>

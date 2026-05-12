@@ -7,13 +7,21 @@ import { ASSET_LIBRARY } from '@/data/assets';
 
 interface AssetsModalProps {
     isOpen: boolean;
+    type: 'logos' | 'shapes' | null;
     onClose: () => void;
 }
 
-const CATEGORIES = Object.keys(ASSET_LIBRARY);
+export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
+    const CATEGORIES = type === 'shapes' ? ['Standalone', 'Compositions'] : Object.keys(ASSET_LIBRARY).filter(c => !['Standalone', 'Compositions'].includes(c));
+    const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
 
-export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
-    const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0] || 'Logos');
+    React.useEffect(() => {
+        if (CATEGORIES.length > 0 && !CATEGORIES.includes(selectedCategory)) {
+            setSelectedCategory(CATEGORIES[0]);
+        }
+    }, [type, selectedCategory]);
+
+    const title = type === 'shapes' ? 'NBG Ellipses' : 'NBG Logos';
     const { addShape, offset, zoom } = useCanvasStore();
 
     if (!isOpen) return null;
@@ -44,7 +52,7 @@ export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
 
                 {/* Header */}
                 <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-6)' }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Assets</h2>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{title}</h2>
                     <button onClick={onClose} style={{ padding: 'var(--space-1)' }}>
                         <X size={20} />
                     </button>
@@ -71,79 +79,122 @@ export function AssetsModal({ isOpen, onClose }: AssetsModalProps) {
 
                 {/* Assets Grid */}
                 <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 'var(--space-4)',
-                    marginBottom: 'var(--space-6)',
                     maxHeight: '60vh',
-                    overflowY: 'auto'
+                    overflowY: 'auto',
+                    paddingRight: 'var(--space-2)'
                 }}>
-                    {(ASSET_LIBRARY[selectedCategory] || []).map((asset) => (
-                        <div
-                            key={asset.id}
-                            onClick={() => {
-                                // Default drop in center of current view
-                                // Using offset and zoom to calculate a rough center
-                                // Assuming typical viewport is around 1000x800, center is ~500x400
-                                const targetX = (500 - offset.x) / zoom;
-                                const targetY = (400 - offset.y) / zoom;
+                    {['EN', 'GR'].map(lang => {
+                        const langAssets = (ASSET_LIBRARY[selectedCategory] || []).filter(a => a.lang === lang);
+                        if (langAssets.length === 0) return null;
 
-                                addShape({
-                                    id: crypto.randomUUID(),
-                                    type: 'svg',
-                                    x: targetX,
-                                    y: targetY,
-                                    width: 200,
-                                    height: 200,
-                                    fill: '#000000', // Default fill that can be changed
-                                    svgContent: asset.content
-                                });
-                                onClose();
-                            }}
-                            style={{
-                                position: 'relative',
-                                aspectRatio: '1/1',
-                                border: '1px solid hsl(var(--color-border))',
-                                borderRadius: 'var(--radius-md)',
-                                backgroundColor: 'hsl(var(--color-bg-app))',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                padding: 'var(--space-2)',
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = 'hsl(var(--color-accent))';
-                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-panel))';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = 'hsl(var(--color-border))';
-                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-app))';
-                            }}
-                            title={asset.name}
-                        >
-                            <div style={{
-                                position: 'absolute',
-                                top: '4px',
-                                right: '4px',
-                                fontSize: '0.65rem',
-                                fontWeight: 600,
-                                backgroundColor: 'hsl(var(--color-bg-panel))',
-                                border: '1px solid hsl(var(--color-border))',
-                                color: 'hsl(var(--color-text-secondary))',
-                                padding: '2px 4px',
-                                borderRadius: '4px',
-                                opacity: 0.8
-                            }}>
-                                {asset.lang}
+                        return (
+                            <div key={lang} style={{ marginBottom: 'var(--space-6)' }}>
+                                {type === 'logos' && (
+                                    <h3 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: 'var(--space-4)', color: 'hsl(var(--color-text-secondary))' }}>
+                                        {lang === 'EN' ? 'English' : 'Greek'}
+                                    </h3>
+                                )}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(4, 1fr)',
+                                    gap: 'var(--space-4)'
+                                }}>
+                                    {langAssets.map((asset) => (
+                                        <div
+                                            key={asset.id}
+                                            onClick={() => {
+                                                // Default drop in center of current view
+                                                // Using offset and zoom to calculate a rough center
+                                                // Assuming typical viewport is around 1000x800, center is ~500x400
+                                                const targetX = (500 - offset.x) / zoom;
+                                                const targetY = (400 - offset.y) / zoom;
+
+                                                let initialW = 200;
+                                                let initialH = 200;
+                                                const vbMatch = asset.content.match(/viewBox="[\d\.-]+\s+[\d\.-]+\s+([\d\.-]+)\s+([\d\.-]+)"/);
+                                                if (vbMatch) {
+                                                    initialW = parseFloat(vbMatch[1]);
+                                                    initialH = parseFloat(vbMatch[2]);
+                                                } else {
+                                                    const wMatch = asset.content.match(/width="([\d\.-]+)[a-z]*"/i);
+                                                    const hMatch = asset.content.match(/height="([\d\.-]+)[a-z]*"/i);
+                                                    if (wMatch && hMatch) {
+                                                        initialW = parseFloat(wMatch[1]);
+                                                        initialH = parseFloat(hMatch[1]);
+                                                    }
+                                                }
+
+                                                if (initialW > 600) {
+                                                    const ratio = 600 / initialW;
+                                                    initialW = 600;
+                                                    initialH = initialH * ratio;
+                                                }
+
+                                                addShape({
+                                                    id: crypto.randomUUID(),
+                                                    type: 'svg',
+                                                    x: targetX - initialW / 2,
+                                                    y: targetY - initialH / 2,
+                                                    width: initialW,
+                                                    height: initialH,
+                                                    fill: type === 'shapes' ? '#000000' : 'transparent',
+                                                    svgContent: asset.content,
+                                                    aspectRatioLocked: true,
+                                                    name: asset.name,
+                                                    colorEditable: type === 'shapes'
+                                                });
+                                                onClose();
+                                            }}
+                                            style={{
+                                                position: 'relative',
+                                                aspectRatio: '1/1',
+                                                border: '1px solid hsl(var(--color-border))',
+                                                borderRadius: 'var(--radius-md)',
+                                                backgroundColor: 'hsl(var(--color-bg-app))',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                padding: 'var(--space-2)',
+                                                transition: 'all 0.2s',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.borderColor = 'hsl(var(--color-accent))';
+                                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-panel))';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.borderColor = 'hsl(var(--color-border))';
+                                                e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-app))';
+                                            }}
+                                            title={asset.name}
+                                        >
+                                            {type === 'logos' && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '4px',
+                                                    right: '4px',
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: 600,
+                                                    backgroundColor: 'hsl(var(--color-bg-panel))',
+                                                    border: '1px solid hsl(var(--color-border))',
+                                                    color: 'hsl(var(--color-text-secondary))',
+                                                    padding: '2px 4px',
+                                                    borderRadius: '4px',
+                                                    opacity: 0.8
+                                                }}>
+                                                    {asset.lang}
+                                                </div>
+                                            )}
+                                            <div 
+                                                style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                dangerouslySetInnerHTML={{ __html: asset.content.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid meet">') }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <div 
-                                style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                dangerouslySetInnerHTML={{ __html: asset.content.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid meet">') }}
-                            />
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Footer */}

@@ -8,7 +8,7 @@ import { ZoomControls } from "./ZoomControls";
 export function Canvas() {
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const { offset, zoom, shapes, activeTool, setActiveTool, setOffset, setZoom, addShape, selectedIds, setSelectedIds, updateShape, removeShape, saveSnapshot, undo, redo, copy, paste, group, ungroup, snapToGrid, gridSize, toggleSnapToGrid, moveToArtboard } = useCanvasStore();
+    const { offset, zoom, shapes, activeTool, setActiveTool, setOffset, setZoom, addShape, selectedIds, setSelectedIds, updateShape, removeShape, saveSnapshot, undo, redo, copy, paste, group, ungroup, snapToGrid, gridSize, toggleSnapToGrid, moveToArtboard, loadTemplates } = useCanvasStore();
 
     const [drawingShape, setDrawingShape] = useState<Shape | null>(null);
 
@@ -38,6 +38,11 @@ export function Canvas() {
         if (isRotating) return 'grabbing';
         return 'default';
     };
+
+    // Load templates from file on mount
+    useEffect(() => {
+        loadTemplates();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -288,15 +293,15 @@ export function Canvas() {
             return;
         }
 
-        if (activeTool === 'rectangle' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'artboard') {
+        if (activeTool === 'rectangle' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'artboard' || activeTool === 'draw-artboard') {
             const newShape: Shape = {
                 id: crypto.randomUUID(),
-                type: activeTool,
+                type: activeTool === 'draw-artboard' ? 'artboard' : activeTool,
                 x: snapValue(x),
                 y: snapValue(y),
                 width: 0,
                 height: 0,
-                fill: activeTool === 'line' ? 'transparent' : '#F5F8F6',
+                fill: activeTool === 'line' ? 'transparent' : (activeTool === 'draw-artboard' ? '#FFFFFF' : '#F5F8F6'),
                 stroke: activeTool === 'line' ? '#000000' : undefined,
                 strokeWidth: activeTool === 'line' ? 2 : undefined,
                 x2: snapValue(x),
@@ -853,7 +858,7 @@ export function Canvas() {
                                 fontSize={10 / zoom}
                                 style={{ pointerEvents: 'none' }}
                             >
-                                Artboard
+                                {shape.name || 'Artboard'}
                             </text>
                             {/* Artboard Background */}
                             <rect
@@ -875,34 +880,102 @@ export function Canvas() {
                     )}
 
                     {shape.type === 'rectangle' && (
-                        <rect
-                            x={shape.x}
-                            y={shape.y}
-                            width={shape.width}
-                            height={shape.height}
-                            fill={shape.fill}
-                            rx={shape.cornerRadius || 0}
-                            ry={shape.cornerRadius || 0}
-                            stroke={isSelected && !isChild ? "hsl(var(--color-accent))" : (shape.stroke || "transparent")}
-                            strokeWidth={1 / zoom}
-                            vectorEffect="non-scaling-stroke"
-                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
-                            style={{ pointerEvents: isChild ? 'none' : 'auto' }} // Children don't capture mouse events separately yet if grouped
-                        />
+                        <g>
+                            <rect
+                                x={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    if (align === 'inside') return shape.x + sw / 2;
+                                    if (align === 'outside') return shape.x - sw / 2;
+                                    return shape.x;
+                                })()}
+                                y={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    if (align === 'inside') return shape.y + sw / 2;
+                                    if (align === 'outside') return shape.y - sw / 2;
+                                    return shape.y;
+                                })()}
+                                width={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    if (align === 'inside') return Math.max(0, shape.width - sw);
+                                    if (align === 'outside') return shape.width + sw;
+                                    return shape.width;
+                                })()}
+                                height={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    if (align === 'inside') return Math.max(0, shape.height - sw);
+                                    if (align === 'outside') return shape.height + sw;
+                                    return shape.height;
+                                })()}
+                                fill={shape.fill}
+                                rx={shape.cornerRadius || 0}
+                                ry={shape.cornerRadius || 0}
+                                stroke={shape.stroke || "transparent"}
+                                strokeWidth={shape.strokeWidth || 0}
+                                onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                                style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                            />
+                            {isSelected && !isChild && (
+                                <rect
+                                    x={shape.x}
+                                    y={shape.y}
+                                    width={shape.width}
+                                    height={shape.height}
+                                    fill="none"
+                                    rx={shape.cornerRadius || 0}
+                                    ry={shape.cornerRadius || 0}
+                                    stroke="hsl(var(--color-accent))"
+                                    strokeWidth={1 / zoom}
+                                    vectorEffect="non-scaling-stroke"
+                                    style={{ pointerEvents: 'none' }}
+                                />
+                            )}
+                        </g>
                     )}
                     {shape.type === 'ellipse' && (
-                        <ellipse
-                            cx={shape.x + shape.width / 2}
-                            cy={shape.y + shape.height / 2}
-                            rx={Math.abs(shape.width / 2)}
-                            ry={Math.abs(shape.height / 2)}
-                            fill={shape.fill}
-                            stroke={isSelected && !isChild ? "hsl(var(--color-accent))" : (shape.stroke || "transparent")}
-                            strokeWidth={1 / zoom}
-                            vectorEffect="non-scaling-stroke"
-                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
-                            style={{ pointerEvents: isChild ? 'none' : 'auto' }}
-                        />
+                        <g>
+                            <ellipse
+                                cx={shape.x + shape.width / 2}
+                                cy={shape.y + shape.height / 2}
+                                rx={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    const baseRx = Math.abs(shape.width / 2);
+                                    if (align === 'inside') return Math.max(0, baseRx - sw / 2);
+                                    if (align === 'outside') return baseRx + sw / 2;
+                                    return baseRx;
+                                })()}
+                                ry={(() => {
+                                    const sw = shape.strokeWidth || 0;
+                                    const align = shape.strokeAlignment || 'center';
+                                    const baseRy = Math.abs(shape.height / 2);
+                                    if (align === 'inside') return Math.max(0, baseRy - sw / 2);
+                                    if (align === 'outside') return baseRy + sw / 2;
+                                    return baseRy;
+                                })()}
+                                fill={shape.fill}
+                                stroke={shape.stroke || "transparent"}
+                                strokeWidth={shape.strokeWidth || 0}
+                                onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                                style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                            />
+                            {isSelected && !isChild && (
+                                <ellipse
+                                    cx={shape.x + shape.width / 2}
+                                    cy={shape.y + shape.height / 2}
+                                    rx={Math.abs(shape.width / 2)}
+                                    ry={Math.abs(shape.height / 2)}
+                                    fill="none"
+                                    stroke="hsl(var(--color-accent))"
+                                    strokeWidth={1 / zoom}
+                                    vectorEffect="non-scaling-stroke"
+                                    style={{ pointerEvents: 'none' }}
+                                />
+                            )}
+                        </g>
                     )}
                     {shape.type === 'line' && (
                         <line
@@ -918,14 +991,14 @@ export function Canvas() {
                         />
                     )}
                     {shape.type === 'text' && (
-                        <foreignObject
+                        <foreignObject 
                             x={shape.x}
                             y={shape.y}
-                            width={shape.width}
+                            width={shape.width} 
                             height={shape.height}
                             onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
                             onDoubleClick={(e) => !isChild && handleShapeDoubleClick(e, shape.id)}
-                            style={{ pointerEvents: isChild ? 'none' : 'auto', overflow: 'visible' }}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto' }}
                         >
                             {editingId === shape.id ? (
                                 <div
@@ -951,15 +1024,14 @@ export function Canvas() {
                                         whiteSpace: 'pre-wrap',
                                         userSelect: 'text',
                                         cursor: 'text',
-                                        lineHeight: 1.2,
+                                        lineHeight: shape.lineHeight || 1.2,
                                         outline: 'none',
-                                        minHeight: '1em'
+                                        minHeight: '1em',
+                                        letterSpacing: `${shape.letterSpacing || 0}em`,
+                                        WebkitTextStroke: shape.strokeWidth && shape.strokeWidth > 0 ? `${shape.strokeWidth}px ${shape.stroke || 'black'}` : 'unset',
                                     }}
                                     ref={(el) => {
                                         if (el) {
-                                            // Focus and select all on mount if needed, or just focus
-                                            // setTimeout(() => el.focus(), 0); 
-                                            // Simple focus might cause issue if re-rendering, but let's try autoFocus doesn't work on div
                                             if (document.activeElement !== el) el.focus();
                                         }
                                     }}
@@ -981,7 +1053,8 @@ export function Canvas() {
                                         whiteSpace: 'pre-wrap',
                                         userSelect: 'none',
                                         cursor: 'default',
-                                        lineHeight: 1.2
+                                        lineHeight: shape.lineHeight || 1.2,
+                                        letterSpacing: `${shape.letterSpacing || 0}em`,
                                     }}
                                 >
                                     {shape.textContent || 'Text'}
@@ -1001,20 +1074,37 @@ export function Canvas() {
                             style={{ pointerEvents: isChild ? 'none' : 'auto' }}
                         />
                     )}
-                    {shape.type === 'svg' && shape.svgContent && (
-                        <g
-                            transform={`translate(${shape.x}, ${shape.y})`}
-                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
-                            style={{ pointerEvents: isChild ? 'none' : 'auto', color: shape.fill }}
-                        >
-                            <foreignObject width={shape.width} height={shape.height}>
-                                <div 
-                                    style={{ width: '100%', height: '100%', color: shape.fill }} 
-                                    dangerouslySetInnerHTML={{ __html: shape.svgContent.replace(/fill="[^"]*"/g, 'fill="currentColor"') }}
-                                />
-                            </foreignObject>
-                        </g>
-                    )}
+                    {shape.type === 'svg' && shape.svgContent && (() => {
+                        const uniqueClass = `svg-shape-${shape.id.replace(/-/g, '')}`;
+                        let content = shape.svgContent.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="none">');
+                        if (shape.colorEditable) {
+                            let styles = '';
+                            if (shape.fill && shape.fill !== 'transparent') {
+                                styles += `.${uniqueClass} path, .${uniqueClass} rect, .${uniqueClass} circle, .${uniqueClass} ellipse, .${uniqueClass} polygon, .${uniqueClass} polyline { fill: ${shape.fill} !important; }\n`;
+                            }
+                            if (shape.stroke && shape.strokeWidth && shape.strokeWidth > 0) {
+                                styles += `.${uniqueClass} path, .${uniqueClass} rect, .${uniqueClass} circle, .${uniqueClass} ellipse, .${uniqueClass} polygon, .${uniqueClass} polyline { stroke: ${shape.stroke} !important; stroke-width: ${shape.strokeWidth}px !important; }\n`;
+                            }
+                            if (styles) {
+                                content = content.replace(/<svg([^>]*)>/, `<svg$1><style>${styles}</style>`);
+                            }
+                        }
+                        return (
+                            <g
+                                transform={`translate(${shape.x}, ${shape.y})`}
+                                onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                                style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                            >
+                                <foreignObject width={shape.width} height={shape.height}>
+                                    <div 
+                                        className={uniqueClass}
+                                        style={{ width: '100%', height: '100%' }} 
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                    />
+                                </foreignObject>
+                            </g>
+                        );
+                    })()}
                     {shape.type === 'video' && (
                         <foreignObject
                             x={shape.x}
@@ -1136,14 +1226,15 @@ export function Canvas() {
                 <defs>
                     <pattern
                         id="dot-grid"
-                        x={offset.x % (gridSize * zoom)}
-                        y={offset.y % (gridSize * zoom)}
-                        width={gridSize * zoom}
-                        height={gridSize * zoom}
+                        x={offset.x % (20 * zoom)}
+                        y={offset.y % (20 * zoom)}
+                        width={20 * zoom}
+                        height={20 * zoom}
                         patternUnits="userSpaceOnUse"
                     >
                         <circle cx="1" cy="1" r="1" fill="hsl(var(--color-border))" />
                     </pattern>
+
                 </defs>
 
                 <rect width="100%" height="100%" fill="url(#dot-grid)" onMouseDown={handleMouseDown} />

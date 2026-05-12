@@ -1,155 +1,50 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useCanvasStore, Shape } from "@/store/canvasStore";
+import { useState } from 'react';
+import { useCanvasStore } from "@/store/canvasStore";
 import { ArtboardModal } from "@/components/modals/ArtboardModal";
 import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { AssetsModal } from "@/components/modals/AssetsModal";
-import { Dropdown } from "@/components/ui/Dropdown";
-import { ArrowLeft, ArrowRight, FolderOpen, Save, MousePointer2, Hand, ZoomIn, ZoomOut, Search, Type, Square, Circle, Minus, Image as ImageIcon, Video, Layout, LayoutTemplate, Box } from 'lucide-react';
+import { SaveModal } from "@/components/modals/SaveModal";
+import { OpenModal } from "@/components/modals/OpenModal";
+import { ArrowLeft, ArrowRight, FolderOpen, Save, Layout, LayoutTemplate, Box } from 'lucide-react';
 import styles from './Toolbar.module.css';
 
 export function Toolbar() {
-    const { activeTool, setActiveTool, undo, redo, past, future, addShape, offset, zoom } = useCanvasStore();
+    const { activeTool, undo, redo, past, future, currentProjectName, newProject } = useCanvasStore();
     const [showArtboardModal, setShowArtboardModal] = useState(false);
     const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-    const [showAssetsModal, setShowAssetsModal] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const mediaTypeRef = useRef<'image' | 'video' | null>(null);
+    const [assetsModalType, setAssetsModalType] = useState<'logos' | 'shapes' | null>(null);
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showOpenModal, setShowOpenModal] = useState(false);
 
-    const handleMediaClick = (type: 'image' | 'video') => {
-        mediaTypeRef.current = type;
-        if (fileInputRef.current) {
-            fileInputRef.current.accept = type === 'image' ? "image/*" : "video/*";
-            fileInputRef.current.click();
-        }
+    const handleNew = () => {
+        newProject(); // opens a new blank tab
     };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !mediaTypeRef.current) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            if (event.target?.result) {
-                const src = event.target.result as string;
-                const type = mediaTypeRef.current!;
-
-                const createShape = (originalWidth: number, originalHeight: number) => {
-                    // 1. Max Limit 480px
-                    const maxDim = 480;
-                    const scale = Math.min(1, maxDim / Math.max(originalWidth, originalHeight));
-                    const width = originalWidth * scale;
-                    const height = originalHeight * scale;
-
-                    // 2. Parenting Logic
-                    const { selectedIds, shapes, offset, zoom } = useCanvasStore.getState(); // Get fresh state
-                    const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
-                    const selectedShape = selectedId ? shapes.find(s => s.id === selectedId) : null;
-
-                    const isArtboardSelected = selectedShape?.type === 'artboard';
-
-                    let x: number, y: number;
-                    let parentId: string | undefined;
-
-                    if (isArtboardSelected && selectedShape) {
-                        // Center in Artboard
-                        const artboard = selectedShape;
-                        // Center relative to Artboard: (ArtboardW - ImageW) / 2
-                        x = (artboard.width - width) / 2;
-                        y = (artboard.height - height) / 2;
-
-                        // We will add to root first then move, OR easier:
-                        // Just create it, then we need to insert it into the children of the artboard.
-                        // But addShape adds to root. modifying addShape is complex in store.
-                        // We can use the store's moveLayer or just modify the shape before adding? 
-                        // Wait, addShape only pushes to root properties. 
-                        // To add as child, we should use 'updateShape' on the parent?
-                        // No, store structure is recursive. We need to add it to the parent's children array.
-                        // Best approach with current store API:
-                        // 1. Add to root (at absolute position matching the calculated relative position)
-                        // 2. Move to artboard using moveToArtboard? 
-                        // moveToArtboard implementation: x = shape.x - artboard.x.
-                        // So if we want relative X, we should set absolute X = artboard.x + relativeX.
-
-                        // Absolute coords for 'addShape' to work with 'moveToArtboard' later:
-                        const absoluteX = artboard.x + x;
-                        const absoluteY = artboard.y + y;
-
-                        const newShape: Shape = {
-                            id: crypto.randomUUID(),
-                            type: type,
-                            x: absoluteX,
-                            y: absoluteY,
-                            width: width,
-                            height: height,
-                            fill: 'transparent',
-                            src: src,
-                            aspectRatioLocked: true // Default lock for media
-                        };
-                        addShape(newShape);
-
-                        // Immediate move to artboard
-                        // We need access to moveToArtboard from store.
-                        useCanvasStore.getState().moveToArtboard(newShape.id, artboard.id);
-
-                    } else {
-                        // Viewport Center
-                        // Viewport Center in Screen Coords: window.innerWidth / 2, window.innerHeight / 2
-                        // Convert to World Coords: (Screen - Offset) / Zoom
-                        const cx = (window.innerWidth / 2 - offset.x) / zoom;
-                        const cy = (window.innerHeight / 2 - offset.y) / zoom;
-
-                        x = cx - width / 2;
-                        y = cy - height / 2;
-
-                        const newShape: Shape = {
-                            id: crypto.randomUUID(),
-                            type: type,
-                            x: x,
-                            y: y,
-                            width: width,
-                            height: height,
-                            fill: 'transparent',
-                            src: src,
-                            aspectRatioLocked: true // Default lock for media
-                        };
-                        addShape(newShape);
-                    }
-                };
-
-                if (type === 'image') {
-                    const img = new Image();
-                    img.onload = () => createShape(img.naturalWidth, img.naturalHeight);
-                    img.src = src;
-                } else {
-                    const video = document.createElement('video');
-                    video.onloadedmetadata = () => createShape(video.videoWidth, video.videoHeight);
-                    video.src = src;
-                }
-            }
-        };
-        reader.readAsDataURL(file);
-        // Reset input
-        e.target.value = '';
-    };
-
-
 
     return (
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", fontWeight: 500, width: '100%', height: '100%' }}>
             {/* Left Side */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifySelf: 'start' }}>
-                <span style={{ marginRight: "16px", fontSize: "1.1rem" }}><span style={{ color: "#00DEF8" }}>NBG</span> Creative Studio</span>
+                <span style={{ marginRight: "16px", fontSize: "1.1rem" }}>
+                    <span style={{ color: "#00DEF8" }}>NBG</span> Creative Studio
+                </span>
 
-
-                <button className={styles.actionButton}>
+                <button className={styles.actionButton} onClick={handleNew}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> New
+                </button>
+                <button className={styles.actionButton} onClick={() => setShowOpenModal(true)}>
                     <FolderOpen size={16} /> Open
                 </button>
-                <button className={styles.actionButton}>
+                <button className={styles.actionButton} onClick={() => setShowSaveModal(true)}>
                     <Save size={16} /> Save
                 </button>
 
+                {currentProjectName && (
+                    <span style={{ fontSize: '12px', color: 'hsl(var(--color-text-muted))', fontWeight: 400 }}>
+                        — {currentProjectName}
+                    </span>
+                )}
             </div>
 
             {/* Center Tools */}
@@ -159,72 +54,22 @@ export function Toolbar() {
                 gap: '16px',
                 justifySelf: 'center'
             }}>
-                <button className={styles.toolButton} data-active={activeTool === 'select'} onClick={() => setActiveTool('select')}>
-                    <MousePointer2 size={16} /> Select
+                <button className={styles.toolButton} onClick={() => setAssetsModalType('logos')}>
+                    <Box size={16} /> NBG Logos
                 </button>
-                <button className={styles.toolButton} data-active={activeTool === 'hand'} onClick={() => setActiveTool('hand')}>
-                    <Hand size={16} /> Move
+                <button className={styles.toolButton} onClick={() => setAssetsModalType('shapes')}>
+                    <Box size={16} /> NBG Ellipses
                 </button>
-
-                <Dropdown
-                    label={<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Search size={16} /> Zoom</div>}
-                    isActive={['zoom', 'zoom-out'].includes(activeTool)}
-                    className={styles.toolButton}
-                >
-                    <div onClick={() => setActiveTool('zoom')} className={styles.dropdownItem} data-active={activeTool === 'zoom'}>
-                        <ZoomIn size={14} /> Zoom in
-                    </div>
-                    <div onClick={() => setActiveTool('zoom-out')} className={styles.dropdownItem} data-active={activeTool === 'zoom-out'}>
-                        <ZoomOut size={14} /> Zoom out
-                    </div>
-                </Dropdown>
-
-                <button className={styles.toolButton} data-active={activeTool === 'text'} onClick={() => setActiveTool('text')}>
-                    <Type size={16} /> Text
-                </button>
-
-                <Dropdown
-                    label={<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Square size={16} /> Shapes</div>}
-                    isActive={['rectangle', 'ellipse', 'line'].includes(activeTool)}
-                    className={styles.toolButton}
-                >
-                    <div onClick={() => setActiveTool('rectangle')} className={styles.dropdownItem} data-active={activeTool === 'rectangle'}>
-                        <Square size={14} /> Rectangle
-                    </div>
-                    <div onClick={() => setActiveTool('ellipse')} className={styles.dropdownItem} data-active={activeTool === 'ellipse'}>
-                        <Circle size={14} /> Ellipse
-                    </div>
-                    <div onClick={() => setActiveTool('line')} className={styles.dropdownItem} data-active={activeTool === 'line'}>
-                        <Minus size={14} /> Line
-                    </div>
-                </Dropdown>
-
-                <Dropdown
-                    label={<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImageIcon size={16} /> Media</div>}
-                    className={styles.toolButton}
-                >
-                    <div onClick={() => handleMediaClick('image')} className={styles.dropdownItem}>
-                        <ImageIcon size={14} /> Image
-                    </div>
-                    <div onClick={() => handleMediaClick('video')} className={styles.dropdownItem}>
-                        <Video size={14} /> Video
-                    </div>
-                </Dropdown>
-
                 <button className={styles.toolButton} onClick={() => setShowTemplatesModal(true)}>
-                    <LayoutTemplate size={16} /> Templates
-                </button>
-                <button className={styles.toolButton} onClick={() => setShowAssetsModal(true)}>
-                    <Box size={16} /> Assets
+                    <LayoutTemplate size={16} /> NBG Templates
                 </button>
                 <button className={styles.toolButton} data-active={activeTool === 'artboard'} onClick={() => setShowArtboardModal(true)}>
-                    <Layout size={16} /> Add Artboard
+                    <Layout size={16} /> SoMe Templates
                 </button>
             </div>
 
             {/* Right Side */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifySelf: 'end' }}>
-
                 <button onClick={undo} disabled={past.length === 0} className={styles.actionButton}>
                     <ArrowLeft size={16} /> Undo
                 </button>
@@ -233,18 +78,11 @@ export function Toolbar() {
                 </button>
             </div>
 
-
-            <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
-                accept="image/*,video/*"
-            />
-
             <ArtboardModal isOpen={showArtboardModal} onClose={() => setShowArtboardModal(false)} />
             <TemplatesModal isOpen={showTemplatesModal} onClose={() => setShowTemplatesModal(false)} />
-            <AssetsModal isOpen={showAssetsModal} onClose={() => setShowAssetsModal(false)} />
+            <AssetsModal isOpen={assetsModalType !== null} type={assetsModalType} onClose={() => setAssetsModalType(null)} />
+            <SaveModal isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} />
+            <OpenModal isOpen={showOpenModal} onClose={() => setShowOpenModal(false)} />
         </div>
     );
 }

@@ -27,17 +27,21 @@ export interface Shape {
     opacity?: number;
     cornerRadius?: number;
     aspectRatioLocked?: boolean;
+    colorEditable?: boolean;
     isTemplate?: boolean;
     templatePlatform?: string;
     templateBusiness?: string;
     svgContent?: string;
+    strokeAlignment?: 'center' | 'inside' | 'outside';
+    lineHeight?: number;
+    letterSpacing?: number;
 }
 
 interface CanvasState {
     offset: { x: number; y: number };
     zoom: number;
     shapes: Shape[];
-    activeTool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard' | 'hand' | 'zoom' | 'zoom-out';
+    activeTool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard' | 'draw-artboard' | 'hand' | 'zoom' | 'zoom-out';
     selectedIds: string[];
     past: Shape[][];
     future: Shape[][];
@@ -68,6 +72,18 @@ interface CanvasState {
     moveLayer: (dragId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
     templates: Template[];
     addTemplate: (template: Template) => void;
+    loadTemplates: () => Promise<void>;
+    currentProjectName: string | null;
+    saveProject: (name: string) => Promise<{ success: boolean; filename?: string; error?: string }>;
+    loadProject: (filename: string) => Promise<boolean>;
+    // --- Tabs ---
+    activeTabId: string;
+    tabBar: TabMeta[];
+    tabStates: { [id: string]: TabSnapshot };
+    switchTab: (id: string) => void;
+    openNewTab: (initial?: Partial<TabSnapshot & { name: string; filename: string }>) => void;
+    closeTab: (id: string) => void;
+    newProject: () => void;
 }
 
 export interface Template {
@@ -80,6 +96,44 @@ export interface Template {
     width: number;
     height: number;
 }
+
+export interface TabMeta {
+    id: string;
+    name: string;
+    filename: string | null;
+}
+
+export interface TabSnapshot {
+    shapes: Shape[];
+    zoom: number;
+    offset: { x: number; y: number };
+    selectedIds: string[];
+    past: Shape[][];
+    future: Shape[][];
+    currentProjectName: string | null;
+}
+
+const INITIAL_TAB_ID = 'tab-initial';
+
+const blankSnapshot = (): TabSnapshot => ({
+    shapes: [],
+    zoom: 1,
+    offset: { x: 0, y: 0 },
+    selectedIds: [],
+    past: [],
+    future: [],
+    currentProjectName: null,
+});
+
+const snapshotFromState = (state: CanvasState): TabSnapshot => ({
+    shapes: state.shapes,
+    zoom: state.zoom,
+    offset: state.offset,
+    selectedIds: state.selectedIds,
+    past: state.past,
+    future: state.future,
+    currentProjectName: state.currentProjectName,
+});
 
 // Recursively reorder a shape by ID
 const recursiveReorder = (shapes: Shape[], id: string, action: 'front' | 'back' | 'forward' | 'backward'): { shapes: Shape[], success: boolean } => {
@@ -233,9 +287,165 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     future: [],
     clipboard: [],
     snapToGrid: true,
-    gridSize: 20,
+    gridSize: 1,
     templates: [],
-    addTemplate: (template) => set((state) => ({ templates: [...state.templates, template] })),
+    currentProjectName: null,
+    // --- Tabs ---
+    activeTabId: INITIAL_TAB_ID,
+    tabBar: [{ id: INITIAL_TAB_ID, name: 'Untitled', filename: null }],
+    tabStates: {},
+    switchTab: (id: string) => set((state) => {
+        if (id === state.activeTabId) return {};
+        const saved: TabSnapshot = snapshotFromState(state);
+        const target = state.tabStates[id] ?? blankSnapshot();
+        return {
+            tabStates: { ...state.tabStates, [state.activeTabId]: saved },
+            activeTabId: id,
+            shapes: target.shapes,
+            zoom: target.zoom,
+            offset: target.offset,
+            selectedIds: target.selectedIds,
+            past: target.past,
+            future: target.future,
+            currentProjectName: target.currentProjectName,
+        };
+    }),
+    openNewTab: (initial?) => set((state) => {
+        const newId = `tab-${Date.now()}`;
+        const newMeta: TabMeta = { id: newId, name: initial?.name ?? 'Untitled', filename: initial?.filename ?? null };
+        const saved: TabSnapshot = snapshotFromState(state);
+        const snap: TabSnapshot = {
+            shapes: initial?.shapes ?? [],
+            zoom: initial?.zoom ?? 1,
+            offset: initial?.offset ?? { x: 0, y: 0 },
+            selectedIds: [],
+            past: [],
+            future: [],
+            currentProjectName: initial?.name ?? null,
+        };
+        return {
+            tabBar: [...state.tabBar, newMeta],
+            tabStates: { ...state.tabStates, [state.activeTabId]: saved },
+            activeTabId: newId,
+            shapes: snap.shapes,
+            zoom: snap.zoom,
+            offset: snap.offset,
+            selectedIds: snap.selectedIds,
+            past: snap.past,
+            future: snap.future,
+            currentProjectName: snap.currentProjectName,
+        };
+    }),
+    closeTab: (id: string) => set((state) => {
+        if (state.tabBar.length === 1) {
+            // Last tab — reset to blank instead of closing
+            return { ...blankSnapshot(), currentProjectName: null, tabBar: [{ id: state.activeTabId, name: 'Untitled', filename: null }], tabStates: {} };
+        }
+        const newTabBar = state.tabBar.filter(t => t.id !== id);
+        const newTabStates = { ...state.tabStates };
+        delete newTabStates[id];
+        if (id !== state.activeTabId) {
+            return { tabBar: newTabBar, tabStates: newTabStates };
+        }
+        // Closed the active tab — switch to the adjacent one
+        const closedIdx = state.tabBar.findIndex(t => t.id === id);
+        const nextTab = newTabBar[Math.min(closedIdx, newTabBar.length - 1)];
+        const target = newTabStates[nextTab.id] ?? blankSnapshot();
+        delete newTabStates[nextTab.id];
+        return {
+            tabBar: newTabBar,
+            tabStates: newTabStates,
+            activeTabId: nextTab.id,
+            shapes: target.shapes,
+            zoom: target.zoom,
+            offset: target.offset,
+            selectedIds: target.selectedIds,
+            past: target.past,
+            future: target.future,
+            currentProjectName: target.currentProjectName,
+        };
+    }),
+    addTemplate: async (template) => {
+        // Optimistically update in-memory state
+        set((state) => ({ templates: [...state.templates, template] }));
+        // Persist to file via API
+        try {
+            await fetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(template),
+            });
+        } catch (e) {
+            console.error('Failed to persist template:', e);
+        }
+    },
+    loadTemplates: async () => {
+        try {
+            const res = await fetch('/api/templates');
+            if (res.ok) {
+                const data = await res.json();
+                set({ templates: data });
+            }
+        } catch (e) {
+            console.error('Failed to load templates:', e);
+        }
+    },
+    saveProject: async (name: string) => {
+        const state = useCanvasStore.getState();
+        const payload = {
+            filename: name,
+            name,
+            version: '1.0',
+            shapes: state.shapes,
+            zoom: state.zoom,
+            offset: state.offset,
+        };
+        try {
+            const res = await fetch('/api/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Update active tab name in the tab bar
+                set((s) => ({
+                    currentProjectName: name,
+                    tabBar: s.tabBar.map(t =>
+                        t.id === s.activeTabId ? { ...t, name, filename: data.filename } : t
+                    ),
+                }));
+                return { success: true, filename: data.filename };
+            }
+            return { success: false, error: data.error };
+        } catch (e) {
+            return { success: false, error: String(e) };
+        }
+    },
+    loadProject: async (filename: string) => {
+        try {
+            const res = await fetch(`/api/projects/${encodeURIComponent(filename)}`);
+            if (!res.ok) return false;
+            const data = await res.json();
+            const name = data.name ?? filename.replace('.flow', '');
+            // Always open in a new tab
+            useCanvasStore.getState().openNewTab({
+                name,
+                filename,
+                shapes: data.shapes ?? [],
+                zoom: data.zoom ?? 1,
+                offset: data.offset ?? { x: 0, y: 0 },
+            });
+            return true;
+        } catch (e) {
+            console.error('Failed to load project:', e);
+            return false;
+        }
+    },
+    newProject: () => {
+        // Open a fresh blank tab
+        useCanvasStore.getState().openNewTab();
+    },
 
     setOffset: (updater) => set((state) => {
         const newOffset = typeof updater === 'function' ? updater(state.offset) : updater;

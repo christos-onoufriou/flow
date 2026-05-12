@@ -4,6 +4,8 @@ import { LayersPanel } from "@/components/layout/LayersPanel";
 import { PropertiesPanel } from "@/components/layout/PropertiesPanel";
 import { Canvas } from "@/components/canvas/Canvas";
 import { PromptBox } from "@/components/ui/PromptBox";
+import { SecondaryToolbar } from "@/components/layout/SecondaryToolbar";
+import { TabBar } from "@/components/layout/TabBar";
 
 export default function Home() {
   return (
@@ -12,6 +14,8 @@ export default function Home() {
       leftSidebar={<LayersPanel />}
       rightSidebar={<PropertiesPanel />}
     >
+      <SecondaryToolbar />
+      <TabBar />
       <Canvas />
       <PromptBox />
     </AppShell>

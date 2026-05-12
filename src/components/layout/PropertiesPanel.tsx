@@ -302,8 +302,8 @@ function PropertiesPanelContent() {
                                 </div>
                             </div>
 
-                            {/* Row 2: Size, Style, Align */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '80px 40px 1fr', gap: 'var(--space-2)' }}>
+                            {/* Row 2: Size, Leading, Kerning, Style, Align */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 30px 2fr', gap: 'var(--space-2)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Size</label>
                                     <input
@@ -316,7 +316,51 @@ function PropertiesPanelContent() {
                                             border: '1px solid hsl(var(--color-border))',
                                             borderRadius: '4px',
                                             color: 'hsl(var(--color-text-primary))',
-                                            padding: '0 4px', // Reduced top/bottom padding, rely on height/flex
+                                            padding: '0 4px',
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            width: '100%',
+                                            height: '24px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Leading</label>
+                                    <input
+                                        type="number"
+                                        value={shape.lineHeight || 1.2}
+                                        step={0.1}
+                                        onChange={(e) => handleChange('lineHeight', Number(e.target.value))}
+                                        className="no-spin"
+                                        style={{
+                                            background: 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            padding: '0 4px',
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            width: '100%',
+                                            height: '24px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '10px', color: 'hsl(var(--color-text-muted))', marginBottom: '2px' }}>Kerning</label>
+                                    <input
+                                        type="number"
+                                        value={shape.letterSpacing || 0}
+                                        step={0.1}
+                                        onChange={(e) => handleChange('letterSpacing', Number(e.target.value))}
+                                        className="no-spin"
+                                        style={{
+                                            background: 'hsl(var(--color-bg-app))',
+                                            border: '1px solid hsl(var(--color-border))',
+                                            borderRadius: '4px',
+                                            color: 'hsl(var(--color-text-primary))',
+                                            padding: '0 4px',
                                             fontSize: '12px',
                                             outline: 'none',
                                             width: '100%',
@@ -393,12 +437,29 @@ function PropertiesPanelContent() {
                     {shape.type !== 'line' && shape.type !== 'text' && (
                         <div>
                             <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Fill</label>
-                            <ColorInput
-                                value={shape.fill}
-                                onChange={(v) => handleChange('fill', v)}
-                                isOpen={activePopup === 'fill'}
-                                onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
-                            />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <ColorInput
+                                    value={shape.fill}
+                                    onChange={(v) => handleChange('fill', v)}
+                                    isOpen={activePopup === 'fill'}
+                                    onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
+                                />
+                                <button 
+                                    onClick={() => handleChange('fill', 'transparent')}
+                                    style={{ 
+                                        ...buttonStyle, 
+                                        height: '24px',
+                                        fontSize: '12px',
+                                        padding: '0 8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderColor: shape.fill === 'transparent' ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                                    }}
+                                >
+                                    None
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -407,31 +468,146 @@ function PropertiesPanelContent() {
                     {shape.type === 'text' && (
                         <div>
                             <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Color</label>
-                            <ColorInput
-                                value={shape.fill}
-                                onChange={(v) => handleChange('fill', v)}
-                                isOpen={activePopup === 'fill'}
-                                onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
-                            />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <ColorInput
+                                    value={shape.fill}
+                                    onChange={(v) => handleChange('fill', v)}
+                                    isOpen={activePopup === 'fill'}
+                                    onToggle={() => setActivePopup(activePopup === 'fill' ? null : 'fill')}
+                                />
+                                <button 
+                                    onClick={() => handleChange('fill', 'transparent')}
+                                    style={{ 
+                                        ...buttonStyle, 
+                                        height: '24px',
+                                        fontSize: '12px',
+                                        padding: '0 8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderColor: shape.fill === 'transparent' ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                                    }}
+                                >
+                                    None
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    <div>
-                        <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Stroke</label>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                            <div style={{ flex: 1 }}>
-                                <ColorInput
-                                    value={shape.stroke || '#000000'}
-                                    onChange={(v) => handleChange('stroke', v)}
-                                    isOpen={activePopup === 'stroke'}
-                                    onToggle={() => setActivePopup(activePopup === 'stroke' ? null : 'stroke')}
-                                />
+                    {/* Stroke Section (Hidden for text) */}
+                    {shape.type !== 'svg' && shape.type !== 'text' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))" }}>Stroke</label>
                             </div>
-                            <div style={{ width: '60px' }}>
-                                <LabelInput label="W" value={shape.strokeWidth || 0} onChange={(v) => handleChange('strokeWidth', Number(v))} />
+                            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>
+                                    <ColorInput 
+                                        value={shape.stroke || '#000000'} 
+                                        onChange={(color) => handleChange('stroke', color)}
+                                        isOpen={activePopup === 'stroke'}
+                                        onToggle={() => setActivePopup(activePopup === 'stroke' ? null : 'stroke')}
+                                    />
+                                </div>
+                                <div style={{ width: '60px' }}>
+                                    <LabelInput label="W" value={shape.strokeWidth || 0} onChange={(v) => handleChange('strokeWidth', Number(v))} />
+                                </div>
+                                <button 
+                                    onClick={() => handleChange('strokeWidth', 0)}
+                                    style={{ 
+                                        ...buttonStyle, 
+                                        height: '24px',
+                                        fontSize: '12px',
+                                        padding: '0 8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderColor: (shape.strokeWidth === 0 || !shape.stroke) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                                    }}
+                                >
+                                    None
+                                </button>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Stroke Alignment Options (Hidden for line, svg, and text) */}
+                    {shape.type !== 'line' && shape.type !== 'svg' && shape.type !== 'text' && (
+                        <div>
+                            <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Stroke Alignment</label>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <button 
+                                    title="Center"
+                                    onClick={() => handleChange('strokeAlignment', 'center')}
+                                    style={{ 
+                                        width: '24px', 
+                                        height: '24px', 
+                                        background: (!shape.strokeAlignment || shape.strokeAlignment === 'center') ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                        border: '1px solid',
+                                        borderColor: (!shape.strokeAlignment || shape.strokeAlignment === 'center') ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
+                                        borderRadius: '4px', 
+                                        color: 'hsl(var(--color-text-primary))', 
+                                        cursor: 'pointer', 
+                                        display: 'flex', 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        padding: 0 
+                                    }}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24">
+                                        <rect x="6" y="6" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="4"/>
+                                        <rect x="6" y="6" width="12" height="12" fill="none" stroke="hsl(var(--color-bg-panel))" strokeWidth="1"/>
+                                    </svg>
+                                </button>
+                                <button 
+                                    title="Inside"
+                                    onClick={() => handleChange('strokeAlignment', 'inside')}
+                                    style={{ 
+                                        width: '24px', 
+                                        height: '24px', 
+                                        background: shape.strokeAlignment === 'inside' ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                        border: '1px solid',
+                                        borderColor: shape.strokeAlignment === 'inside' ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
+                                        borderRadius: '4px', 
+                                        color: 'hsl(var(--color-text-primary))', 
+                                        cursor: 'pointer', 
+                                        display: 'flex', 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        padding: 0 
+                                    }}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24">
+                                        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"/>
+                                        <rect x="7" y="7" width="10" height="10" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                                <button 
+                                    title="Outside"
+                                    onClick={() => handleChange('strokeAlignment', 'outside')}
+                                    style={{ 
+                                        width: '24px', 
+                                        height: '24px', 
+                                        background: shape.strokeAlignment === 'outside' ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                        border: '1px solid',
+                                        borderColor: shape.strokeAlignment === 'outside' ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
+                                        borderRadius: '4px', 
+                                        color: 'hsl(var(--color-text-primary))', 
+                                        cursor: 'pointer', 
+                                        display: 'flex', 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        padding: 0 
+                                    }}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24">
+                                        <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+                                        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '4px' }}>Opacity</label>
@@ -670,34 +846,39 @@ import { generatePNGDataURL } from "@/utils/exportUtils";
 
 function TemplateProperties({ shape, onChange, onAddTemplate, buttonStyle }: { shape: any, onChange: any, onAddTemplate: (t: any) => void, buttonStyle: any }) {
     const [isHovered, setIsHovered] = useState(false);
-    const isDisabled = !shape.isTemplate && (!shape.templatePlatform || !shape.templateBusiness);
-    const isActive = shape.isTemplate;
+    const [saved, setSaved] = useState(false);
+
+    // Only platform is required
+    const isDisabled = !shape.templatePlatform;
 
     const handleAddTemplate = async () => {
         if (isDisabled) return;
 
-        // Toggle state
-        const newIsTemplate = !shape.isTemplate;
-        onChange('isTemplate', newIsTemplate);
-
-        if (newIsTemplate) {
-            // Save as template
-            const thumbnail = await generatePNGDataURL([shape]);
-
-            // Deep clone shape for template storage
-            const templateShape = JSON.parse(JSON.stringify(shape));
-
-            onAddTemplate({
-                id: crypto.randomUUID(),
-                name: shape.name || 'Untitled Artboard',
-                thumbnail,
-                shapes: [templateShape], // Store the artboard itself as the root
-                platform: shape.templatePlatform,
-                business: shape.templateBusiness,
-                width: shape.width,
-                height: shape.height
-            });
+        // Generate thumbnail (best-effort)
+        let thumbnail = '';
+        try {
+            thumbnail = await generatePNGDataURL([shape]);
+        } catch (e) {
+            // thumbnail optional
         }
+
+        // Deep clone for template storage
+        const templateShape = JSON.parse(JSON.stringify(shape));
+
+        onAddTemplate({
+            id: crypto.randomUUID(),
+            name: shape.name || 'Untitled Artboard',
+            thumbnail,
+            shapes: [templateShape],
+            platform: shape.templatePlatform,
+            business: shape.templateBusiness || '',
+            width: shape.width,
+            height: shape.height
+        });
+
+        // Brief success feedback
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
     };
 
     return (
@@ -711,10 +892,10 @@ function TemplateProperties({ shape, onChange, onAddTemplate, buttonStyle }: { s
                         onChange={(v) => onChange('templatePlatform', v)}
                         options={[
                             { value: 'LinkedIn', label: 'LinkedIn' },
-                            { value: 'Instagram', label: 'Instagram' },
+                            { value: 'YouTube', label: 'YouTube' },
                             { value: 'Facebook', label: 'Facebook' },
-                            { value: 'TikTok', label: 'TikTok' },
-                            { value: 'YouTube', label: 'YouTube' }
+                            { value: 'Instagram', label: 'Instagram' },
+                            { value: 'TikTok', label: 'TikTok' }
                         ]}
                     />
                     <SelectInput
@@ -730,6 +911,12 @@ function TemplateProperties({ shape, onChange, onAddTemplate, buttonStyle }: { s
                     />
                 </div>
 
+                {isDisabled && (
+                    <p style={{ fontSize: '11px', color: 'hsl(var(--color-text-muted))', margin: 0 }}>
+                        Select a platform to save this artboard as a template.
+                    </p>
+                )}
+
                 <button
                     onClick={handleAddTemplate}
                     disabled={isDisabled}
@@ -738,15 +925,19 @@ function TemplateProperties({ shape, onChange, onAddTemplate, buttonStyle }: { s
                     style={{
                         ...buttonStyle,
                         width: '100%',
-                        backgroundColor: (isActive || (isHovered && !isDisabled)) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-bg-app))',
-                        color: (isActive || (isHovered && !isDisabled)) ? 'white' : 'hsl(var(--color-text-primary))',
-                        borderColor: (isActive || (isHovered && !isDisabled)) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
-                        opacity: isDisabled ? 0.5 : 1,
+                        backgroundColor: saved
+                            ? 'hsl(142, 71%, 45%)'
+                            : (isHovered && !isDisabled) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-bg-app))',
+                        color: (saved || (isHovered && !isDisabled)) ? 'white' : 'hsl(var(--color-text-primary))',
+                        borderColor: saved
+                            ? 'hsl(142, 71%, 45%)'
+                            : (isHovered && !isDisabled) ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))',
+                        opacity: isDisabled ? 0.4 : 1,
                         cursor: isDisabled ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s ease'
                     }}
                 >
-                    Add as Template
+                    {saved ? '✓ Saved!' : 'Save as Template'}
                 </button>
             </div>
         </div>
