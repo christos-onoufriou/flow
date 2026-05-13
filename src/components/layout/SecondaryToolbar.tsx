@@ -114,7 +114,8 @@ export function SecondaryToolbar() {
                 display: 'flex',
                 gap: '8px',
                 boxShadow: 'var(--shadow-md)',
-                zIndex: 100
+                zIndex: 100,
+                width: 'max-content'
             }}>
                 <button className={styles.toolButton} data-active={activeTool === 'select'} onClick={() => setActiveTool('select')}>
                     <MousePointer2 size={16} /> Select

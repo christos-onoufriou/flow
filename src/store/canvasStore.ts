@@ -62,6 +62,7 @@ interface CanvasState {
     redo: () => void;
     copy: () => void;
     paste: () => void;
+    duplicateShapes: (idsToDuplicate: string[]) => void;
     group: () => void;
     ungroup: () => void;
     toggleSnapToGrid: () => void;
@@ -275,6 +276,30 @@ const recursiveToggleVisibility = (shapes: Shape[], id: string): Shape[] => {
         }
         return shape;
     });
+};
+
+// Recursively find a shape by ID
+const findShapeDeep = (shapes: Shape[], id: string): Shape | null => {
+    for (const shape of shapes) {
+        if (shape.id === id) return shape;
+        if (shape.children) {
+            const found = findShapeDeep(shape.children, id);
+            if (found) return found;
+        }
+    }
+    return null;
+};
+
+// Find the parent ID of a given shape ID
+const findParentId = (shapes: Shape[], childId: string, currentParentId: string | null = null): string | null => {
+    for (const shape of shapes) {
+        if (shape.id === childId) return currentParentId;
+        if (shape.children) {
+            const found = findParentId(shape.children, childId, shape.id);
+            if (found !== undefined && found !== null) return found;
+        }
+    }
+    return null;
 };
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -523,7 +548,17 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         };
     }),
     copy: () => set((state) => {
-        const selectedShapes = state.shapes.filter(s => state.selectedIds.includes(s.id));
+        const selectedShapes: any[] = [];
+        state.selectedIds.forEach(id => {
+            const shape = findShapeDeep(state.shapes, id);
+            if (shape) {
+                const parentId = findParentId(state.shapes, id);
+                selectedShapes.push({
+                    ...shape,
+                    originalParentId: parentId
+                });
+            }
+        });
         if (selectedShapes.length === 0) return {};
         // Deep clone to avoid reference issues
         return { clipboard: JSON.parse(JSON.stringify(selectedShapes)) };
@@ -533,10 +568,12 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
         // Save snapshot before paste
         const newPast = [...state.past, state.shapes];
+        let newShapesArr = [...state.shapes];
+        const newSelectedIds: string[] = [];
 
-        const newShapes = state.clipboard.map(s => {
+        state.clipboard.forEach((s: any) => {
             const newId = crypto.randomUUID();
-            return {
+            const cloned = {
                 ...s,
                 id: newId,
                 x: s.x + 20,
@@ -544,11 +581,61 @@ export const useCanvasStore = create<CanvasState>((set) => ({
                 x2: s.x2 !== undefined ? s.x2 + 20 : undefined,
                 y2: s.y2 !== undefined ? s.y2 + 20 : undefined
             };
+            delete cloned.originalParentId;
+
+            if (s.originalParentId) {
+                // Try to insert it into the same parent
+                const insertRes = insertRelative(newShapesArr, s.originalParentId, cloned, 'inside');
+                if (insertRes.success) {
+                    newShapesArr = insertRes.shapes;
+                } else {
+                    newShapesArr.push(cloned);
+                }
+            } else {
+                newShapesArr.push(cloned);
+            }
+            newSelectedIds.push(newId);
         });
 
         return {
-            shapes: [...state.shapes, ...newShapes],
-            selectedIds: newShapes.map(s => s.id),
+            shapes: newShapesArr,
+            selectedIds: newSelectedIds,
+            past: newPast,
+            future: []
+        };
+    }),
+    duplicateShapes: (idsToDuplicate: string[]) => set((state) => {
+        let newShapesArr = [...state.shapes];
+        const newSelectedIds: string[] = [];
+        let anyDuplicated = false;
+
+        for (const id of idsToDuplicate) {
+            const originalShape = findShapeDeep(newShapesArr, id);
+            if (originalShape) {
+                const clonedShape = JSON.parse(JSON.stringify(originalShape));
+                clonedShape.id = crypto.randomUUID();
+                
+                // Insert exactly after the original shape
+                const insertRes = insertRelative(newShapesArr, id, clonedShape, 'after');
+                if (insertRes.success) {
+                    newShapesArr = insertRes.shapes;
+                    newSelectedIds.push(clonedShape.id);
+                    anyDuplicated = true;
+                } else {
+                    // Fallback to top level
+                    newShapesArr.push(clonedShape);
+                    newSelectedIds.push(clonedShape.id);
+                    anyDuplicated = true;
+                }
+            }
+        }
+
+        if (!anyDuplicated) return {};
+
+        const newPast = [...state.past, state.shapes];
+        return {
+            shapes: newShapesArr,
+            selectedIds: newSelectedIds,
             past: newPast,
             future: []
         };

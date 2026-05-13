@@ -27,6 +27,7 @@ export function Canvas() {
     const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 }); // World coords
     const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 }); // World coords
     const [isAltPressed, setIsAltPressed] = useState(false); // Track Alt key for Zoom tool
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, show: boolean } | null>(null);
 
     // Cursor Logic
     const getCursor = () => {
@@ -63,23 +64,23 @@ export function Canvas() {
                     selectedIds.forEach(id => removeShape(id));
                     setSelectedIds([]);
                 }
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
                 if (e.shiftKey) {
                     redo();
                 } else {
                     undo();
                 }
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
                 e.preventDefault();
                 redo();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
                 e.preventDefault();
                 copy();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') {
                 e.preventDefault();
                 paste();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'x') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'x') {
                 e.preventDefault();
                 copy();
                 if (selectedIds.length > 0) {
@@ -87,11 +88,11 @@ export function Canvas() {
                     selectedIds.forEach(id => removeShape(id));
                     setSelectedIds([]);
                 }
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
                 e.preventDefault();
                 copy();
                 paste();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
                 e.preventDefault();
                 if (e.shiftKey) {
                     ungroup();
@@ -110,9 +111,14 @@ export function Canvas() {
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('click', handleClick);
         };
     }, [selectedIds, removeShape, setSelectedIds, editingId, redo, undo, copy, paste, group, ungroup, toggleSnapToGrid]);
 
@@ -163,6 +169,17 @@ export function Canvas() {
         if (activeTool !== 'select') return;
         e.stopPropagation();
 
+        const isRightClick = e.button === 2;
+        if (isRightClick) {
+            if (selectedIds.includes(id)) {
+                return; // Keep current selection if right-clicking a selected item
+            }
+            const shape = findShape(shapes, id);
+            if (shape?.type === 'artboard' && selectedIds.length > 0) {
+                return; // Keep current selection if right-clicking the artboard background
+            }
+        }
+
         const isSelected = selectedIds.includes(id);
         let newSelectedIds = selectedIds;
 
@@ -182,16 +199,29 @@ export function Canvas() {
         // Prepare Drag
         const { x, y } = getMousePosition(e);
         setDragStart({ x, y });
-        const initialPos: { [id: string]: Shape } = {};
 
-        newSelectedIds.forEach(id => {
-            const s = findShape(shapes, id);
-            if (s) {
-                initialPos[id] = { ...s };
-            }
-        });
-        setInitialShapePositions(initialPos);
-        saveSnapshot(); // Save before move
+        let finalSelectedIds = newSelectedIds;
+        if (e.altKey) {
+            useCanvasStore.getState().duplicateShapes(newSelectedIds);
+            const currentState = useCanvasStore.getState();
+            finalSelectedIds = currentState.selectedIds;
+            
+            const initialPos: { [id: string]: Shape } = {};
+            finalSelectedIds.forEach(id => {
+                const s = findShape(currentState.shapes, id);
+                if (s) initialPos[id] = { ...s };
+            });
+            setInitialShapePositions(initialPos);
+        } else {
+            const initialPos: { [id: string]: Shape } = {};
+            newSelectedIds.forEach(id => {
+                const s = findShape(shapes, id);
+                if (s) initialPos[id] = { ...s };
+            });
+            setInitialShapePositions(initialPos);
+            saveSnapshot(); // Save before move
+        }
+        
         setIsDragging(true);
     };
 
@@ -258,6 +288,8 @@ export function Canvas() {
         }
 
         if (activeTool === 'select') {
+            if (e.button === 2) return; // Do not start marquee or clear selection on right click
+            
             // Marquee selection start
             setIsSelecting(true);
             setSelectionStart({ x, y });
@@ -1221,6 +1253,10 @@ export function Canvas() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu({ x: e.clientX, y: e.clientY, show: true });
+            }}
         >
             <svg width="100%" height="100%" style={{ display: 'block' }}>
                 <defs>
@@ -1258,6 +1294,45 @@ export function Canvas() {
                     )}
                 </g>
             </svg>
+
+            {contextMenu?.show && (
+                <div 
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                    position: 'fixed',
+                    top: contextMenu.y,
+                    left: contextMenu.x,
+                    backgroundColor: 'hsl(var(--color-bg-panel))',
+                    border: '1px solid hsl(var(--color-border))',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '4px',
+                    boxShadow: 'var(--shadow-lg)',
+                    zIndex: 1000,
+                    minWidth: '150px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                }}>
+                    <button 
+                        onClick={() => { copy(); setContextMenu(null); }}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'transparent', border: 'none', color: 'hsl(var(--color-text-primary))', cursor: 'pointer', textAlign: 'left', borderRadius: 'var(--radius-sm)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--color-border))'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                        <span>Copy</span>
+                        <span style={{ color: 'hsl(var(--color-text-muted))', fontSize: '12px' }}>⌘C</span>
+                    </button>
+                    <button 
+                        onClick={() => { paste(); setContextMenu(null); }}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'transparent', border: 'none', color: 'hsl(var(--color-text-primary))', cursor: 'pointer', textAlign: 'left', borderRadius: 'var(--radius-sm)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--color-border))'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                        <span>Paste</span>
+                        <span style={{ color: 'hsl(var(--color-text-muted))', fontSize: '12px' }}>⌘V</span>
+                    </button>
+                </div>
+            )}
 
             {/* HUD */}
             <ZoomControls />
