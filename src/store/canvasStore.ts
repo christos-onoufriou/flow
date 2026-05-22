@@ -54,7 +54,7 @@ interface CanvasState {
     addShape: (shape: Shape) => void;
     updateShape: (id: string, updates: Partial<Shape>) => void;
     removeShape: (id: string) => void;
-    setActiveTool: (tool: 'select' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'artboard' | 'hand' | 'zoom' | 'zoom-out') => void;
+    setActiveTool: (tool: CanvasState['activeTool']) => void;
     setSelectedIds: (ids: string[]) => void;
     reorderShape: (id: string, action: 'front' | 'back' | 'forward' | 'backward') => void;
     saveSnapshot: () => void;
@@ -302,7 +302,7 @@ const findParentId = (shapes: Shape[], childId: string, currentParentId: string 
     return null;
 };
 
-export const useCanvasStore = create<CanvasState>((set) => ({
+export const useCanvasStore = create<CanvasState>((set, get) => ({
     offset: { x: 0, y: 0 },
     zoom: 1,
     shapes: [],
@@ -416,7 +416,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         }
     },
     saveProject: async (name: string) => {
-        const state = useCanvasStore.getState();
+        const state = get();
         const payload = {
             filename: name,
             name,
@@ -454,7 +454,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
             const data = await res.json();
             const name = data.name ?? filename.replace('.flow', '');
             // Always open in a new tab
-            useCanvasStore.getState().openNewTab({
+            get().openNewTab({
                 name,
                 filename,
                 shapes: data.shapes ?? [],
@@ -469,7 +469,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     },
     newProject: () => {
         // Open a fresh blank tab
-        useCanvasStore.getState().openNewTab();
+        get().openNewTab();
     },
 
     setOffset: (updater) => set((state) => {
