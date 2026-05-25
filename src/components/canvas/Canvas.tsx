@@ -379,10 +379,15 @@ export function Canvas() {
                 const cx = initial.x + initial.width / 2;
                 const cy = initial.y + initial.height / 2;
 
-                // Calculate angle from center to mouse
-                const dx = x - cx;
-                const dy = y - cy;
-                let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90; // +90 because handle is at top
+                const startDx = dragStart.x - cx;
+                const startDy = dragStart.y - cy;
+                const startAngle = Math.atan2(startDy, startDx) * (180 / Math.PI);
+
+                const currentDx = x - cx;
+                const currentDy = y - cy;
+                const currentAngle = Math.atan2(currentDy, currentDx) * (180 / Math.PI);
+
+                let angle = (initial.rotation || 0) + (currentAngle - startAngle);
 
                 if (e.shiftKey) {
                     angle = Math.round(angle / 15) * 15;
@@ -851,16 +856,179 @@ export function Canvas() {
         }
     };
 
-    const renderShape = (shape: Shape, isChild: boolean = false, groupTransform: string = '') => {
+    const renderShapeList = (shapesToRender: Shape[], isChild: boolean, isSelectionLayer: boolean): React.ReactNode[] => {
+        if (isSelectionLayer) {
+            return shapesToRender.map(shape => renderShape(shape, isChild, true));
+        }
+
+        const elements: React.ReactNode[] = [];
+        let i = 0;
+        while (i < shapesToRender.length) {
+            const shape = shapesToRender[i];
+            if (shape.isMask) {
+                const maskedSiblings = shapesToRender.slice(i + 1);
+                
+                elements.push(
+                    <React.Fragment key={`mask-group-${shape.id}`}>
+                        <defs>
+                            <mask id={`mask-clip-${shape.id}`} maskUnits="userSpaceOnUse" x="-999999" y="-999999" width="1999998" height="1999998">
+                                <g filter="url(#force-white)">
+                                    {renderShape(shape, true, false)}
+                                </g>
+                            </mask>
+                        </defs>
+                        {renderShape(shape, isChild, false)}
+                        <g mask={`url(#mask-clip-${shape.id})`}>
+                            {renderShapeList(maskedSiblings, isChild, false)}
+                        </g>
+                    </React.Fragment>
+                );
+                break;
+            } else {
+                elements.push(renderShape(shape, isChild, false));
+                i++;
+            }
+        }
+        return elements;
+    };
+
+    const renderShape = (shape: Shape, isChild: boolean = false, isSelectionLayer: boolean = false): React.ReactNode => {
         if (shape.visible === false) return null;
 
         const isSelected = selectedIds.includes(shape.id);
         const rotation = shape.rotation || 0;
         const cx = shape.x + shape.width / 2;
         const cy = shape.y + shape.height / 2;
-        const transform = shape.type !== 'line' ? `rotate(${rotation}, ${cx}, ${cy})` : undefined;
+        
+        let transformStr = '';
+        if (shape.type !== 'line') {
+            if (rotation) transformStr += `rotate(${rotation}, ${cx}, ${cy}) `;
+            if (shape.flipX || shape.flipY) {
+                const sx = shape.flipX ? -1 : 1;
+                const sy = shape.flipY ? -1 : 1;
+                transformStr += `translate(${cx}, ${cy}) scale(${sx}, ${sy}) translate(${-cx}, ${-cy})`;
+            }
+        }
+        
+        const transform = transformStr ? transformStr.trim() : undefined;
 
         const opacity = shape.opacity ?? 1;
+
+        if (isSelectionLayer) {
+            return (
+                <React.Fragment key={`sel-${shape.id}`}>
+                    <g transform={transform} className="shape-selection-group">
+                        {shape.type === 'group' && (
+                            <g transform={`translate(${shape.x}, ${shape.y})`}>
+                                {shape.children?.map(child => renderShape(child, true, true))}
+                            </g>
+                        )}
+                        {shape.type === 'artboard' && (
+                            <g transform={`translate(${shape.x}, ${shape.y})`}>
+                                {shape.children?.map(child => renderShape(child, false, true))}
+                            </g>
+                        )}
+                        {isSelected && !drawingShape && !isChild && (
+                            shape.type === 'line' ? (
+                                <>
+                                    <line
+                                        x1={shape.x}
+                                        y1={shape.y}
+                                        x2={shape.x2 ?? shape.x}
+                                        y2={shape.y2 ?? shape.y}
+                                        stroke="transparent"
+                                        strokeWidth={10 / zoom}
+                                        onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
+                                        style={{ cursor: 'move', pointerEvents: 'stroke' }}
+                                    />
+                                    <circle
+                                        cx={shape.x}
+                                        cy={shape.y}
+                                        r={6 / zoom}
+                                        fill="white"
+                                        stroke="hsl(var(--color-accent))"
+                                        strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'start')}
+                                        style={{ cursor: 'move', pointerEvents: 'auto' }}
+                                    />
+                                    <circle
+                                        cx={shape.x2 ?? shape.x}
+                                        cy={shape.y2 ?? shape.y}
+                                        r={6 / zoom}
+                                        fill="white"
+                                        stroke="hsl(var(--color-accent))"
+                                        strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'end')}
+                                        style={{ cursor: 'move', pointerEvents: 'auto' }}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <g>
+                                        <rect
+                                            x={shape.x}
+                                            y={shape.y}
+                                            width={shape.width}
+                                            height={shape.height}
+                                            fill="none"
+                                            stroke="transparent"
+                                            strokeWidth={10 / zoom}
+                                            onMouseDown={(e) => handleShapeMouseDown(e, shape.id)}
+                                            style={{ pointerEvents: 'stroke', cursor: 'move' }}
+                                        />
+                                        <rect
+                                            x={shape.x}
+                                            y={shape.y}
+                                            width={shape.width}
+                                            height={shape.height}
+                                            fill="none"
+                                            stroke="hsl(var(--color-accent))"
+                                            strokeWidth={1 / zoom}
+                                            pointerEvents="none"
+                                            strokeDasharray={shape.type === 'group' ? "4 2" : undefined}
+                                        />
+                                    </g>
+                                    
+                                    {/* Rotate Hit Areas (Larger invisible boxes behind resize handles) */}
+                                    <rect x={shape.x - 16 / zoom} y={shape.y - 16 / zoom} width={32 / zoom} height={32 / zoom} fill="transparent"
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'crosshair', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x + shape.width - 16 / zoom} y={shape.y - 16 / zoom} width={32 / zoom} height={32 / zoom} fill="transparent"
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'crosshair', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x - 16 / zoom} y={shape.y + shape.height - 16 / zoom} width={32 / zoom} height={32 / zoom} fill="transparent"
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'crosshair', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x + shape.width - 16 / zoom} y={shape.y + shape.height - 16 / zoom} width={32 / zoom} height={32 / zoom} fill="transparent"
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'crosshair', pointerEvents: 'auto' }} />
+
+                                    <rect x={shape.x - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                        fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'nw')} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x + shape.width - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                        fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'ne')} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                        fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'sw')} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
+                                    <rect x={shape.x + shape.width - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
+                                        fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'se')} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
+                                    <line
+                                        x1={shape.x + shape.width / 2} y1={shape.y}
+                                        x2={shape.x + shape.width / 2} y2={shape.y - 20 / zoom}
+                                        stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        pointerEvents="none"
+                                    />
+                                    <circle
+                                        cx={shape.x + shape.width / 2} cy={shape.y - 20 / zoom} r={4 / zoom}
+                                        fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
+                                        onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                                    />
+                                </>
+                            )
+                        )}
+                    </g>
+                </React.Fragment>
+            );
+        }
 
         return (
             <React.Fragment key={shape.id}>
@@ -868,10 +1036,7 @@ export function Canvas() {
                     {shape.type === 'group' && (
                         <g transform={`translate(${shape.x}, ${shape.y})`}>
                             {/* Render Children */}
-                            {shape.children?.map(child => renderShape(child, true))}
-
-                            {/* Group Selection Box (if selected) */}
-                            {/* Intentionally transparent container usually, but we might want a border if selected */}
+                            {shape.children && renderShapeList(shape.children, true, false)}
                         </g>
                     )}
 
@@ -906,7 +1071,7 @@ export function Canvas() {
                             />
                             {/* Clipped Children */}
                             <g clipPath={`url(#clip-${shape.id})`} transform={`translate(${shape.x}, ${shape.y})`}>
-                                {shape.children?.map(child => renderShape(child, false))}
+                                {shape.children && renderShapeList(shape.children, false, false)}
                             </g>
                         </g>
                     )}
@@ -1108,7 +1273,13 @@ export function Canvas() {
                     )}
                     {shape.type === 'svg' && shape.svgContent && (() => {
                         const uniqueClass = `svg-shape-${shape.id.replace(/-/g, '')}`;
-                        let content = shape.svgContent.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="none">');
+                        let content = shape.svgContent.replace(/<svg([^>]*)>/i, (match, p1) => {
+                            const attrs = p1
+                                .replace(/\bwidth=(['"])[^'"]*\1/gi, '')
+                                .replace(/\bheight=(['"])[^'"]*\1/gi, '')
+                                .replace(/\bpreserveAspectRatio=(['"])[^'"]*\1/gi, '');
+                            return `<svg${attrs} width="${shape.width}" height="${shape.height}" preserveAspectRatio="none">`;
+                        });
                         if (shape.colorEditable) {
                             let styles = '';
                             if (shape.fill && shape.fill !== 'transparent') {
@@ -1126,15 +1297,9 @@ export function Canvas() {
                                 transform={`translate(${shape.x}, ${shape.y})`}
                                 onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
                                 style={{ pointerEvents: isChild ? 'none' : 'auto' }}
-                            >
-                                <foreignObject width={shape.width} height={shape.height}>
-                                    <div 
-                                        className={uniqueClass}
-                                        style={{ width: '100%', height: '100%' }} 
-                                        dangerouslySetInnerHTML={{ __html: content }}
-                                    />
-                                </foreignObject>
-                            </g>
+                                className={uniqueClass}
+                                dangerouslySetInnerHTML={{ __html: content }}
+                            />
                         );
                     })()}
                     {shape.type === 'video' && (
@@ -1159,79 +1324,7 @@ export function Canvas() {
                         </foreignObject>
                     )}
 
-                    {/* Selection Controls (Only for Top-Level Selected Items) */}
-                    {isSelected && !drawingShape && !isChild && (
-                        shape.type === 'line' ? (
-                            <>
-                                {/* Line Handles */}
-                                <circle
-                                    cx={shape.x}
-                                    cy={shape.y}
-                                    r={6 / zoom}
-                                    fill="white"
-                                    stroke="hsl(var(--color-accent))"
-                                    strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'start')}
-                                    style={{ cursor: 'move' }}
-                                />
-                                <circle
-                                    cx={shape.x2 ?? shape.x}
-                                    cy={shape.y2 ?? shape.y}
-                                    r={6 / zoom}
-                                    fill="white"
-                                    stroke="hsl(var(--color-accent))"
-                                    strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'end')}
-                                    style={{ cursor: 'move' }}
-                                />
-                            </>
-                        ) : (
-                            <>
-                                {/* Bounding Box for Group or Single Item */}
-                                <rect
-                                    x={shape.x}
-                                    y={shape.y}
-                                    width={shape.width}
-                                    height={shape.height}
-                                    fill="none"
-                                    stroke="hsl(var(--color-accent))"
-                                    strokeWidth={1 / zoom}
-                                    pointerEvents="none"
-                                    strokeDasharray={shape.type === 'group' ? "4 2" : undefined}
-                                />
-
-                                {/* Handles (Common for all types including Group) */}
-                                {/* TL */}
-                                <rect x={shape.x - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'nw')} style={{ cursor: 'nwse-resize' }} />
-                                {/* TR */}
-                                <rect x={shape.x + shape.width - 4 / zoom} y={shape.y - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'ne')} style={{ cursor: 'nesw-resize' }} />
-                                {/* BL */}
-                                <rect x={shape.x - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'sw')} style={{ cursor: 'nesw-resize' }} />
-                                {/* BR */}
-                                <rect x={shape.x + shape.width - 4 / zoom} y={shape.y + shape.height - 4 / zoom} width={8 / zoom} height={8 / zoom}
-                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'se')} style={{ cursor: 'nwse-resize' }} />
-
-                                {/* Rotation Handle */}
-                                <line
-                                    x1={shape.x + shape.width / 2} y1={shape.y}
-                                    x2={shape.x + shape.width / 2} y2={shape.y - 20 / zoom}
-                                    stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                />
-                                <circle
-                                    cx={shape.x + shape.width / 2} cy={shape.y - 20 / zoom} r={4 / zoom}
-                                    fill="white" stroke="hsl(var(--color-accent))" strokeWidth={1 / zoom}
-                                    onMouseDown={(e) => handleHandleMouseDown(e, shape.id, 'rotate')} style={{ cursor: 'grab' }}
-                                />
-                            </>
-                        )
-                    )}
+                    {/* Selection Controls have been moved to the selection layer */}
                 </g>
             </React.Fragment>
         );
@@ -1260,6 +1353,13 @@ export function Canvas() {
         >
             <svg width="100%" height="100%" style={{ display: 'block' }}>
                 <defs>
+                    <filter id="force-white">
+                        <feColorMatrix type="matrix" values="
+                            0 0 0 0 1
+                            0 0 0 0 1
+                            0 0 0 0 1
+                            0 0 0 1 0" />
+                    </filter>
                     <pattern
                         id="dot-grid"
                         x={offset.x % (20 * zoom)}
@@ -1276,7 +1376,9 @@ export function Canvas() {
                 <rect width="100%" height="100%" fill="url(#dot-grid)" onMouseDown={handleMouseDown} />
 
                 <g transform={`translate(${offset.x}, ${offset.y}) scale(${zoom})`}>
-                    {[...shapes, ...(drawingShape ? [drawingShape] : [])].map((shape) => renderShape(shape))}
+                    {renderShapeList([...shapes, ...(drawingShape ? [drawingShape] : [])], false, false)}
+                    
+                    {shapes.map((shape) => renderShape(shape, false, true))}
 
                     {isSelecting && (
                         <rect

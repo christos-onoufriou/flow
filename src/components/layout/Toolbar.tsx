@@ -7,14 +7,14 @@ import { TemplatesModal } from "@/components/modals/TemplatesModal";
 import { AssetsModal } from "@/components/modals/AssetsModal";
 import { SaveModal } from "@/components/modals/SaveModal";
 import { OpenModal } from "@/components/modals/OpenModal";
-import { ArrowLeft, ArrowRight, FolderOpen, Save, Layout, LayoutTemplate, Box } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FolderOpen, Save, Layout, LayoutTemplate, Box, Image as ImageIcon } from 'lucide-react';
 import styles from './Toolbar.module.css';
 
 export function Toolbar() {
     const { activeTool, undo, redo, past, future, currentProjectName, newProject } = useCanvasStore();
     const [showArtboardModal, setShowArtboardModal] = useState(false);
     const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-    const [assetsModalType, setAssetsModalType] = useState<'logos' | 'shapes' | null>(null);
+    const [assetsModalType, setAssetsModalType] = useState<'logos' | 'shapes' | 'photos' | null>(null);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showOpenModal, setShowOpenModal] = useState(false);
 
@@ -59,6 +59,9 @@ export function Toolbar() {
                 </button>
                 <button className={styles.toolButton} onClick={() => setAssetsModalType('shapes')}>
                     <Box size={16} /> NBG Ellipses
+                </button>
+                <button className={styles.toolButton} onClick={() => setAssetsModalType('photos')}>
+                    <ImageIcon size={16} /> NBG Photos
                 </button>
                 <button className={styles.toolButton} onClick={() => setShowTemplatesModal(true)}>
                     <LayoutTemplate size={16} /> NBG Templates

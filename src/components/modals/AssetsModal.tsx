@@ -4,15 +4,16 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ASSET_LIBRARY } from '@/data/assets';
+import { PHOTO_LIBRARY } from '@/data/photos';
 
 interface AssetsModalProps {
     isOpen: boolean;
-    type: 'logos' | 'shapes' | null;
+    type: 'logos' | 'shapes' | 'photos' | null;
     onClose: () => void;
 }
 
 export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
-    const CATEGORIES = type === 'shapes' ? ['Standalone', 'Compositions'] : Object.keys(ASSET_LIBRARY).filter(c => !['Standalone', 'Compositions'].includes(c));
+    const CATEGORIES = type === 'photos' ? ['Board', 'Events'] : type === 'shapes' ? ['Standalone', 'Compositions'] : Object.keys(ASSET_LIBRARY).filter(c => !['Standalone', 'Compositions'].includes(c));
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
 
     React.useEffect(() => {
@@ -21,7 +22,7 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
         }
     }, [type, selectedCategory]);
 
-    const title = type === 'shapes' ? 'NBG Ellipses' : 'NBG Logos';
+    const title = type === 'photos' ? 'NBG Photos' : type === 'shapes' ? 'NBG Ellipses' : 'NBG Logos';
     const { addShape, offset, zoom } = useCanvasStore();
 
     if (!isOpen) return null;
@@ -83,7 +84,73 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
                     overflowY: 'auto',
                     paddingRight: 'var(--space-2)'
                 }}>
-                    {['EN', 'GR'].map(lang => {
+                    {type === 'photos' ? (
+                        <div style={{ marginBottom: 'var(--space-6)' }}>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(4, 1fr)',
+                                gap: 'var(--space-4)'
+                            }}>
+                            {PHOTO_LIBRARY[selectedCategory as keyof typeof PHOTO_LIBRARY]?.map(photo => (
+                                <div key={photo.id} onClick={() => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const targetX = (500 - offset.x) / zoom;
+                                        const targetY = (400 - offset.y) / zoom;
+                                        let initialW = img.naturalWidth;
+                                        let initialH = img.naturalHeight;
+                                        if (initialW > 600) {
+                                            const ratio = 600 / initialW;
+                                            initialW = 600;
+                                            initialH = initialH * ratio;
+                                        }
+                                        addShape({
+                                            id: crypto.randomUUID(),
+                                            type: 'image',
+                                            x: targetX - initialW / 2,
+                                            y: targetY - initialH / 2,
+                                            width: initialW,
+                                            height: initialH,
+                                            fill: 'transparent',
+                                            src: photo.path,
+                                            aspectRatioLocked: true,
+                                            name: photo.name
+                                        });
+                                        onClose();
+                                    };
+                                    img.src = photo.path;
+                                }}
+                                style={{
+                                    position: 'relative',
+                                    aspectRatio: '1/1',
+                                    border: '1px solid hsl(var(--color-border))',
+                                    borderRadius: 'var(--radius-md)',
+                                    backgroundColor: 'hsl(var(--color-bg-app))',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 'var(--space-2)',
+                                    transition: 'all 0.2s',
+                                    overflow: 'hidden'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = 'hsl(var(--color-accent))';
+                                    e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-panel))';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = 'hsl(var(--color-border))';
+                                    e.currentTarget.style.backgroundColor = 'hsl(var(--color-bg-app))';
+                                }}
+                                title={photo.name}
+                                >
+                                    <img src={photo.path} alt={photo.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                </div>
+                            ))}
+                            </div>
+                        </div>
+                    ) : (
+                    ['EN', 'GR'].map(lang => {
                         const langAssets = (ASSET_LIBRARY[selectedCategory] || []).filter(a => a.lang === lang);
                         if (langAssets.length === 0) return null;
 
@@ -194,7 +261,7 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
                                 </div>
                             </div>
                         );
-                    })}
+                    }))}
                 </div>
 
                 {/* Footer */}

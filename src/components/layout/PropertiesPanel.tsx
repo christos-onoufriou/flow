@@ -28,7 +28,7 @@ function PropertiesPanelContent() {
     const {
         selectedIds, shapes, updateShape, reorderShape, saveSnapshot,
         alignShapes, distributeShapes, addTemplate,
-        offset, zoom, setOffset, setZoom
+        offset, zoom, setOffset, setZoom, toggleMask
     } = useCanvasStore();
 
     const [activePopup, setActivePopup] = useState<string | null>(null);
@@ -622,6 +622,54 @@ function PropertiesPanelContent() {
                             <div style={{ width: '52px' }}>
                                 <LabelInput label="%" value={Math.round((shape.opacity ?? 1) * 100)} onChange={(v) => handleChange('opacity', Number(v) / 100)} className="no-spin" />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Mask */}
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                        <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '8px' }}>Mask</label>
+                        <button 
+                            onClick={toggleMask} 
+                            style={{ 
+                                ...buttonStyle, 
+                                width: '100%',
+                                background: shape.isMask ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                borderColor: shape.isMask ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                            }}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/><path d="M12 2a10 10 0 0 1 0 20"/></svg>
+                            {shape.isMask ? 'Remove Mask' : 'Use as Mask'}
+                        </button>
+                    </div>
+
+                    {/* Flip */}
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                        <label style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", display: 'block', marginBottom: '8px' }}>Flip</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                                title="Flip Horizontal" 
+                                onClick={() => handleChange('flipX', !shape.flipX)} 
+                                style={{ 
+                                    ...buttonStyle, 
+                                    flex: 1,
+                                    background: shape.flipX ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                    borderColor: shape.flipX ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>
+                            </button>
+                            <button 
+                                title="Flip Vertical" 
+                                onClick={() => handleChange('flipY', !shape.flipY)} 
+                                style={{ 
+                                    ...buttonStyle, 
+                                    flex: 1,
+                                    background: shape.flipY ? 'hsl(var(--color-bg-panel))' : 'hsl(var(--color-bg-app))', 
+                                    borderColor: shape.flipY ? 'hsl(var(--color-accent))' : 'hsl(var(--color-border))' 
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h16M8 8l4-4 4 4M8 16l4 4 4-4"/></svg>
+                            </button>
                         </div>
                     </div>
 

@@ -35,6 +35,9 @@ export interface Shape {
     strokeAlignment?: 'center' | 'inside' | 'outside';
     lineHeight?: number;
     letterSpacing?: number;
+    flipX?: boolean;
+    flipY?: boolean;
+    isMask?: boolean;
 }
 
 interface CanvasState {
@@ -69,6 +72,7 @@ interface CanvasState {
     alignShapes: (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
     distributeShapes: (distribution: 'horizontal' | 'vertical') => void;
     toggleVisibility: (id: string) => void;
+    toggleMask: () => void;
     moveToArtboard: (shapeId: string, artboardId: string | null) => void;
     moveLayer: (dragId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
     templates: Template[];
@@ -918,6 +922,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         const newPast = [...state.past, state.shapes];
         return {
             shapes: recursiveToggleVisibility(state.shapes, id),
+            past: newPast,
+            future: []
+        };
+    }),
+    toggleMask: () => set((state) => {
+        const newPast = [...state.past, state.shapes];
+        let newShapes = [...state.shapes];
+        
+        const toggleMaskDeep = (shapes: Shape[], ids: string[]): Shape[] => {
+            return shapes.map(shape => {
+                if (ids.includes(shape.id)) {
+                    return { ...shape, isMask: !shape.isMask };
+                }
+                if (shape.children) {
+                    return { ...shape, children: toggleMaskDeep(shape.children, ids) };
+                }
+                return shape;
+            });
+        };
+
+        return {
+            shapes: toggleMaskDeep(newShapes, state.selectedIds),
             past: newPast,
             future: []
         };
