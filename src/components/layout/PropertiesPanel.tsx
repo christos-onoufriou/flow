@@ -1,9 +1,9 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Link2, Unlink2 } from 'lucide-react';
 
 import { useCanvasStore } from "@/store/canvasStore";
-import { exportSelectionToSVG, exportSelectionToPNG, exportArtboardToPNG, exportArtboardToJPG } from "@/utils/exportUtils";
+import { exportSelectionToSVG, exportSelectionToPNG, exportArtboardToPNG, exportArtboardToJPG, exportArtboardToSVG } from "@/utils/exportUtils";
 import { findShape } from "@/utils/shapeUtils";
 
 export function PropertiesPanel() {
@@ -696,9 +696,10 @@ function PropertiesPanelContent() {
                 {shape.type === 'artboard' && (
                     <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
                         <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Artboard</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                            <button onClick={() => exportArtboardToJPG(shape)} style={buttonStyle}>JPG</button>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                             <button onClick={() => exportArtboardToPNG(shape)} style={buttonStyle}>PNG</button>
+                            <button onClick={() => exportArtboardToJPG(shape)} style={buttonStyle}>JPG</button>
+                            <button onClick={() => exportArtboardToSVG(shape)} style={buttonStyle}>SVG</button>
                         </div>
                     </div>
                 )}
@@ -761,8 +762,18 @@ const PALETTES = {
 };
 
 function ColorInput({ value, onChange, isOpen, onToggle }: { value: string, onChange: (val: string) => void, isOpen: boolean, onToggle: () => void }) {
+    const anchorRef = useRef<HTMLDivElement>(null);
+    const [coords, setCoords] = useState({ top: 0 });
+
+    useEffect(() => {
+        if (isOpen && anchorRef.current) {
+            const rect = anchorRef.current.getBoundingClientRect();
+            setCoords({ top: rect.top });
+        }
+    }, [isOpen]);
+
     return (
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={anchorRef}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <div
                     onClick={onToggle}
@@ -793,10 +804,11 @@ function ColorInput({ value, onChange, isOpen, onToggle }: { value: string, onCh
 
             {isOpen && (
                 <div style={{
-                    position: 'absolute', top: '-8px', right: 'calc(100% + 33px)', width: '200px', zIndex: 50,
-                    marginTop: '0px', background: 'hsl(var(--color-bg-panel))',
+                    position: 'fixed', top: `${coords.top}px`, right: '290px', width: '200px', zIndex: 100,
+                    marginTop: '0px', background: 'hsla(var(--color-bg-panel-numeric, 240 5% 10%), 0.95)',
+                    backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
                     border: '1px solid hsl(var(--color-border))', borderRadius: '12px',
-                    padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    padding: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4)',
                     boxSizing: 'border-box'
                 }}>
                     {/* Primary */}

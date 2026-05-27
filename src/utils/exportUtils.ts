@@ -43,37 +43,108 @@ const generateShapeSVG = (shape: Shape, offsetX = 0, offsetY = 0): string => {
 
         case 'text': {
             const fontSize = shape.fontSize || 16;
-            const fontFamily = shape.fontFamily || 'sans-serif';
+            
+            // Map CSS variables to valid font strings because 'var()' is invalid in SVG font-family attributes
+            let fontFamily = shape.fontFamily || 'sans-serif';
+            if (fontFamily.includes('var(--font-aeonik-pro)')) fontFamily = "'Aeonik Pro', -apple-system, sans-serif";
+            else if (fontFamily.includes('var(--font-roboto)')) fontFamily = "'Roboto', sans-serif";
+            else if (fontFamily.includes('var(--font-open-sans)')) fontFamily = "'Open Sans', sans-serif";
+            else if (fontFamily.includes('var(--font-lato)')) fontFamily = "'Lato', sans-serif";
+
             const fontWeight = shape.fontWeight || '400';
             const fontStyle = shape.fontStyle || 'normal';
             const textAlign = shape.textAlign || 'left';
             const lineHeight = shape.lineHeight || 1.2;
-            const lines = (shape.textContent || 'Text').split('\n');
+            const letterSpacing = shape.letterSpacing || 0;
+            const rawLines = (shape.textContent || 'Text').split('\n');
             const alignAttr = textAlign === 'center' ? 'middle' : textAlign === 'right' ? 'end' : 'start';
             const textX = textAlign === 'center' ? x + w / 2 : textAlign === 'right' ? x + w : x;
-            const tspans = lines.map((line, i) =>
+            
+            const strokeAttr = sw > 0 ? ` stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round" paint-order="stroke fill"` : '';
+            
+            // Bounding box word-wrapping via exact canvas measurement
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                // Initialize canvas font context to match the shape perfectly
+                ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+            }
+
+            const wrappedLines: string[] = [];
+
+            rawLines.forEach(line => {
+                if (!ctx) {
+                    wrappedLines.push(line);
+                    return;
+                }
+                const words = line.split(' ');
+                let currentLine = '';
+                words.forEach(word => {
+                    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                    // measureText gives pixel width; add manual letter-spacing pixels
+                    const lsPixels = letterSpacing * fontSize;
+                    const testWidth = ctx.measureText(testLine).width + (testLine.length * lsPixels);
+                    
+                    if (testWidth > w && currentLine.length > 0) {
+                        wrappedLines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = testLine;
+                    }
+                });
+                wrappedLines.push(currentLine);
+            });
+
+            const tspans = wrappedLines.map((line, i) =>
                 `<tspan x="${textX}" dy="${i === 0 ? 0 : lineHeight * fontSize}">${escapeHTML(line)}</tspan>`
             ).join('');
-            return `<text x="${textX}" y="${y + fontSize}" fill="${fill}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}" font-style="${fontStyle}" text-anchor="${alignAttr}"${rotAttr}${opacityAttr}>${tspans}</text>`;
+            
+            return `<text x="${textX}" y="${y + fontSize * 0.9}" fill="${fill}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}" font-style="${fontStyle}" letter-spacing="${letterSpacing}em" text-anchor="${alignAttr}"${strokeAttr}${rotAttr}${opacityAttr}>${tspans}</text>`;
         }
 
         case 'image':
-            return `<image href="${shape.src || ''}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${rotAttr}${opacityAttr}/>`;
+            return `<image xlink:href="${escapeHTML(shape.src || '')}" href="${escapeHTML(shape.src || '')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${rotAttr}${opacityAttr}/>`;
 
-        case 'svg':
+        case 'svg': {
             if (!shape.svgContent) return '';
+            // Strip <?xml ... ?> and <!DOCTYPE ...> to prevent invalid nested XML breaking the data URI
+            let cleanSvg = shape.svgContent.replace(/<\?xml[^>]*\?>/gi, '').replace(/<!DOCTYPE[^>]*>/gi, '').trim();
+
+            const uniqueClass = `svg-shape-${shape.id.replace(/-/g, '')}`;
+            cleanSvg = cleanSvg.replace(/<svg([^>]*)>/i, (match, p1) => {
+                const attrs = p1
+                    .replace(/\bwidth=(['"])[^'"]*\1/gi, '')
+                    .replace(/\bheight=(['"])[^'"]*\1/gi, '')
+                    .replace(/\bpreserveAspectRatio=(['"])[^'"]*\1/gi, '');
+                return `<svg${attrs} width="${w}" height="${h}" preserveAspectRatio="none" class="${uniqueClass}">`;
+            });
+
+            if (shape.colorEditable) {
+                let styles = '';
+                if (shape.fill && shape.fill !== 'transparent') {
+                    styles += `.${uniqueClass} path, .${uniqueClass} rect, .${uniqueClass} circle, .${uniqueClass} ellipse, .${uniqueClass} polygon, .${uniqueClass} polyline { fill: ${shape.fill} !important; }\n`;
+                }
+                if (shape.stroke && shape.strokeWidth && shape.strokeWidth > 0) {
+                    styles += `.${uniqueClass} path, .${uniqueClass} rect, .${uniqueClass} circle, .${uniqueClass} ellipse, .${uniqueClass} polygon, .${uniqueClass} polyline { stroke: ${shape.stroke} !important; stroke-width: ${shape.strokeWidth}px !important; }\n`;
+                }
+                if (styles) {
+                    cleanSvg = cleanSvg.replace(/<svg([^>]*)>/i, `<svg$1><style>${styles}</style>`);
+                }
+            }
+
             // Embed SVG inline inside a group positioned at (x, y)
-            return `<g transform="translate(${x}, ${y})"${opacityAttr}>${shape.svgContent}</g>`;
+            return `<g transform="translate(${x}, ${y})"${opacityAttr}>${cleanSvg}</g>`;
+        }
 
         case 'group': {
-            const children = (shape.children || []).map(c => generateShapeSVG(c, ox, oy)).join('\n');
+            const children = generateShapeListSVG(shape.children || [], ox, oy);
             return `<g${rotAttr}${opacityAttr}>${children}</g>`;
         }
 
         case 'artboard': {
             const clipId = `clip-${shape.id}`;
             // Children are stored with coordinates relative to artboard origin (0,0)
-            const children = (shape.children || []).map(c => generateShapeSVG(c, x, y)).join('\n');
+            const children = generateShapeListSVG(shape.children || [], x, y);
             return `
 <clipPath id="${clipId}">
   <rect x="${x}" y="${y}" width="${w}" height="${h}"/>
@@ -86,6 +157,40 @@ const generateShapeSVG = (shape: Shape, offsetX = 0, offsetY = 0): string => {
         default:
             return '';
     }
+};
+
+const generateShapeListSVG = (shapes: Shape[], ox = 0, oy = 0): string => {
+    const elements: string[] = [];
+    let i = 0;
+    while (i < shapes.length) {
+        const shape = shapes[i];
+        const nextShape = i + 1 < shapes.length ? shapes[i + 1] : null;
+
+        if (nextShape && nextShape.isMask) {
+            const maskId = `mask-clip-${nextShape.id}`;
+            const maskShapeSvg = generateShapeSVG(nextShape, ox, oy);
+            const maskedShapeSvg = generateShapeSVG(shape, ox, oy);
+            
+            elements.push(`
+<mask id="${maskId}" maskUnits="userSpaceOnUse" x="-999999" y="-999999" width="1999998" height="1999998">
+  <g filter="url(#force-white)">
+    ${maskShapeSvg}
+  </g>
+</mask>
+<g mask="url(#${maskId})">
+  ${maskedShapeSvg}
+</g>
+            `);
+            i += 2;
+        } else if (shape.isMask) {
+            elements.push(generateShapeSVG(shape, ox, oy));
+            i++;
+        } else {
+            elements.push(generateShapeSVG(shape, ox, oy));
+            i++;
+        }
+    }
+    return elements.join('\n');
 };
 
 // Build a complete standalone SVG string from a list of shapes
@@ -118,9 +223,14 @@ export const generateSVGString = (shapes: Shape[], bounds?: { x: number, y: numb
     const vbW = (maxX - minX) + padding * 2;
     const vbH = (maxY - minY) + padding * 2;
 
-    const content = shapes.map(s => generateShapeSVG(s)).join('\n');
+    const content = generateShapeListSVG(shapes, 0, 0);
 
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}">
+<defs>
+  <filter id="force-white">
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" />
+  </filter>
+</defs>
 ${content}
 </svg>`;
 };
@@ -131,10 +241,13 @@ const generateArtboardSVGString = (artboard: Shape): string => {
     const fill = (!artboard.fill || artboard.fill === 'transparent') ? '#ffffff' : artboard.fill;
     const clipId = `clip-${artboard.id}`;
 
-    const children = (artboard.children || []).map(c => generateShapeSVG(c, x, y)).join('\n');
+    const children = generateShapeListSVG(artboard.children || [], x, y);
 
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${x} ${y} ${width} ${height}" width="${width}" height="${height}">
 <defs>
+  <filter id="force-white">
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" />
+  </filter>
   <clipPath id="${clipId}">
     <rect x="${x}" y="${y}" width="${width}" height="${height}"/>
   </clipPath>
@@ -157,8 +270,39 @@ export const downloadBlob = (blob: Blob, filename: string) => {
     URL.revokeObjectURL(url);
 };
 
-export const exportSelectionToSVG = (shapes: Shape[], filename: string = 'export.svg') => {
-    const svgString = generateSVGString(shapes);
+const fetchAsBase64 = async (url: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.error("Failed to fetch image as base64", e);
+        return url;
+    }
+};
+
+const preloadImages = async (shapes: Shape[]): Promise<Shape[]> => {
+    const processShape = async (shape: Shape): Promise<Shape> => {
+        if (shape.type === 'image' && shape.src && !shape.src.startsWith('data:')) {
+            const base64Src = await fetchAsBase64(shape.src);
+            return { ...shape, src: base64Src };
+        }
+        if (shape.children && shape.children.length > 0) {
+            const processedChildren = await Promise.all(shape.children.map(processShape));
+            return { ...shape, children: processedChildren };
+        }
+        return shape;
+    };
+    return Promise.all(shapes.map(processShape));
+};
+
+export const exportSelectionToSVG = async (shapes: Shape[], filename: string = 'export.svg') => {
+    const preloadedShapes = await preloadImages(shapes);
+    const svgString = generateSVGString(preloadedShapes);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     downloadBlob(blob, filename);
 };
@@ -184,8 +328,9 @@ export const generatePNGDataURL = (shapes: Shape[]): Promise<string> => {
     });
 };
 
-export const exportSelectionToPNG = (shapes: Shape[], filename: string = 'export.png') => {
-    generatePNGDataURL(shapes).then(dataURL => {
+export const exportSelectionToPNG = async (shapes: Shape[], filename: string = 'export.png') => {
+    const preloadedShapes = await preloadImages(shapes);
+    generatePNGDataURL(preloadedShapes).then(dataURL => {
         const link = document.createElement('a');
         link.href = dataURL;
         link.download = filename;
@@ -200,8 +345,9 @@ export const exportSelectionToPNG = (shapes: Shape[], filename: string = 'export
 // Uses a data: URI to avoid the Chrome blob-URL blank-canvas bug.
 // ---------------------------------------------------------------------------
 
-const rasteriseArtboard = (artboard: Shape, mimeType: 'image/png' | 'image/jpeg', filename: string) => {
-    const svgStr = generateArtboardSVGString(artboard);
+const rasteriseArtboard = async (artboard: Shape, mimeType: 'image/png' | 'image/jpeg', filename: string) => {
+    const preloadedArtboard = (await preloadImages([artboard]))[0];
+    const svgStr = generateArtboardSVGString(preloadedArtboard);
     const dataUri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
 
     const img = new Image();
@@ -234,10 +380,17 @@ const rasteriseArtboard = (artboard: Shape, mimeType: 'image/png' | 'image/jpeg'
     img.src = dataUri;
 };
 
-export const exportArtboardToPNG = (artboard: Shape, filename?: string) => {
-    rasteriseArtboard(artboard, 'image/png', filename || `artboard-${artboard.id.slice(0, 4)}.png`);
+export const exportArtboardToPNG = async (artboard: Shape, filename?: string) => {
+    await rasteriseArtboard(artboard, 'image/png', filename || `artboard-${artboard.id.slice(0, 4)}.png`);
 };
 
-export const exportArtboardToJPG = (artboard: Shape, filename?: string) => {
-    rasteriseArtboard(artboard, 'image/jpeg', filename || `artboard-${artboard.id.slice(0, 4)}.jpg`);
+export const exportArtboardToJPG = async (artboard: Shape, filename?: string) => {
+    await rasteriseArtboard(artboard, 'image/jpeg', filename || `artboard-${artboard.id.slice(0, 4)}.jpg`);
+};
+
+export const exportArtboardToSVG = async (artboard: Shape, filename?: string) => {
+    const preloadedArtboard = (await preloadImages([artboard]))[0];
+    const svgStr = generateArtboardSVGString(preloadedArtboard);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    downloadBlob(blob, filename || `artboard-${artboard.id.slice(0, 4)}.svg`);
 };
