@@ -26,6 +26,7 @@
     border-right: 1px solid hsl(var(--color-border));
     background-color: hsl(var(--color-bg-panel));
     padding: var(--space-2);
+    overflow-y: auto;
 }
 
 .canvasArea {
@@ -40,4 +41,5 @@
     border-left: 1px solid hsl(var(--color-border));
     background-color: hsl(var(--color-bg-panel));
     padding: var(--space-2);
+    overflow-y: auto;
 }

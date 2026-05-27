@@ -158,7 +158,7 @@ export function LayersPanel() {
 
 
     // Recursive component
-    const LayerItem = ({ shape, depth }: { shape: Shape, depth: number }) => {
+    const LayerItem = ({ shape, depth, isMasked }: { shape: Shape, depth: number, isMasked?: boolean }) => {
         const isSelected = selectedIds.includes(shape.id);
         const hasChildren = shape.children && shape.children.length > 0;
         const isExpanded = expandedIds.includes(shape.id);
@@ -185,7 +185,7 @@ export function LayersPanel() {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '8px',
-                        paddingLeft: `${8 + depth * 12}px`, // Indentation
+                        paddingLeft: `${8 + depth * 12 + (isMasked ? 16 : 0)}px`, // Indentation
                         marginBottom: '2px',
                         borderRadius: 'var(--radius-sm)',
                         backgroundColor: isSelected ? 'hsl(var(--color-accent))' : (isDragOver && dropPosition === 'inside' ? 'hsl(var(--color-accent) / 0.1)' : 'transparent'),
@@ -237,9 +237,22 @@ export function LayersPanel() {
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                             )}
                         </button>
+
+                        {isMasked && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, marginLeft: '-4px' }}>
+                                <polyline points="15 14 20 9 15 4"/>
+                                <path d="M4 20v-7a4 4 0 0 1 4-4h12"/>
+                            </svg>
+                        )}
+
                         {/* Icon based on type */}
-                        <span style={{ opacity: 0.7 }}>
-                            {shape.type === 'rectangle' ? '⬜' : shape.type === 'ellipse' ? '⭕' : shape.type === 'artboard' ? '🎨' : shape.type === 'text' ? 'T' : '➖'}
+                        <span style={{ opacity: 0.7, display: 'flex', alignItems: 'center' }}>
+                            {shape.isMask ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" />
+                                </svg>
+                            ) : shape.type === 'rectangle' ? '⬜' : shape.type === 'ellipse' ? '⭕' : shape.type === 'artboard' ? '🎨' : shape.type === 'text' ? 'T' : '➖'}
                         </span>
                         <span style={{ textTransform: shape.name ? 'none' : 'capitalize' }}>{shape.name || shape.type}</span>
                     </div>
@@ -249,9 +262,10 @@ export function LayersPanel() {
                 {isExpanded && hasChildren && (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {/* To preserve visual stacking order (top to bottom), iterate in reverse of the data (which is usually adding-order) */}
-                        {[...shape.children!].reverse().map(child => (
-                            <LayerItem key={child.id} shape={child} depth={depth + 1} />
-                        ))}
+                        {[...shape.children!].reverse().map((child, index, arr) => {
+                            const isChildMasked = index > 0 && arr[index - 1].isMask;
+                            return <LayerItem key={child.id} shape={child} depth={depth + 1} isMasked={isChildMasked} />;
+                        })}
                     </div>
                 )}
             </div>
@@ -271,7 +285,10 @@ export function LayersPanel() {
                         No layers
                     </div>
                 )}
-                {reversedShapes.map(shape => <LayerItem key={shape.id} shape={shape} depth={0} />)}
+                {reversedShapes.map((shape, index, arr) => {
+                    const isMasked = index > 0 && arr[index - 1].isMask;
+                    return <LayerItem key={shape.id} shape={shape} depth={0} isMasked={isMasked} />;
+                })}
             </div>
         </div>
     );

@@ -3,6 +3,7 @@ import { Toolbar } from "@/components/layout/Toolbar";
 import { LayersPanel } from "@/components/layout/LayersPanel";
 import { PropertiesPanel } from "@/components/layout/PropertiesPanel";
 import { Canvas } from "@/components/canvas/Canvas";
+import { ZoomControls } from "@/components/canvas/ZoomControls";
 import { PromptBox } from "@/components/ui/PromptBox";
 import { SecondaryToolbar } from "@/components/layout/SecondaryToolbar";
 import { TabBar } from "@/components/layout/TabBar";
@@ -17,6 +18,7 @@ export default function Home() {
       <SecondaryToolbar />
       <TabBar />
       <Canvas />
+      <ZoomControls />
       <PromptBox />
     </AppShell>
   );

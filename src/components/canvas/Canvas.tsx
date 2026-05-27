@@ -4,7 +4,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useCanvasStore } from "@/store/canvasStore";
 import { Shape } from "@/store/canvasStore";
 import { findShape } from "@/utils/shapeUtils";
-import { ZoomControls } from "./ZoomControls";
+import Lottie from 'lottie-react';
+
 export function Canvas() {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -865,25 +866,27 @@ export function Canvas() {
         let i = 0;
         while (i < shapesToRender.length) {
             const shape = shapesToRender[i];
-            if (shape.isMask) {
-                const maskedSiblings = shapesToRender.slice(i + 1);
-                
+            const nextShape = i + 1 < shapesToRender.length ? shapesToRender[i + 1] : null;
+
+            if (nextShape && nextShape.isMask) {
                 elements.push(
-                    <React.Fragment key={`mask-group-${shape.id}`}>
+                    <React.Fragment key={`mask-group-${nextShape.id}`}>
                         <defs>
-                            <mask id={`mask-clip-${shape.id}`} maskUnits="userSpaceOnUse" x="-999999" y="-999999" width="1999998" height="1999998">
+                            <mask id={`mask-clip-${nextShape.id}`} maskUnits="userSpaceOnUse" x="-999999" y="-999999" width="1999998" height="1999998">
                                 <g filter="url(#force-white)">
-                                    {renderShape(shape, true, false)}
+                                    {renderShape(nextShape, true, false)}
                                 </g>
                             </mask>
                         </defs>
-                        {renderShape(shape, isChild, false)}
-                        <g mask={`url(#mask-clip-${shape.id})`}>
-                            {renderShapeList(maskedSiblings, isChild, false)}
+                        <g mask={`url(#mask-clip-${nextShape.id})`}>
+                            {renderShape(shape, isChild, false)}
                         </g>
                     </React.Fragment>
                 );
-                break;
+                i += 2;
+            } else if (shape.isMask) {
+                elements.push(renderShape(shape, isChild, false));
+                i++;
             } else {
                 elements.push(renderShape(shape, isChild, false));
                 i++;
@@ -1271,6 +1274,20 @@ export function Canvas() {
                             style={{ pointerEvents: isChild ? 'none' : 'auto' }}
                         />
                     )}
+                    {shape.type === 'lottie' && shape.svgContent && (
+                        <foreignObject 
+                            x={shape.x}
+                            y={shape.y}
+                            width={shape.width} 
+                            height={shape.height}
+                            onMouseDown={(e) => !isChild && handleShapeMouseDown(e, shape.id)}
+                            style={{ pointerEvents: isChild ? 'none' : 'auto' }}
+                        >
+                            <div style={{ width: '100%', height: '100%' }}>
+                                <Lottie animationData={JSON.parse(shape.svgContent)} loop={true} autoplay={true} style={{ width: '100%', height: '100%' }} />
+                            </div>
+                        </foreignObject>
+                    )}
                     {shape.type === 'svg' && shape.svgContent && (() => {
                         const uniqueClass = `svg-shape-${shape.id.replace(/-/g, '')}`;
                         let content = shape.svgContent.replace(/<svg([^>]*)>/i, (match, p1) => {
@@ -1433,11 +1450,20 @@ export function Canvas() {
                         <span>Paste</span>
                         <span style={{ color: 'hsl(var(--color-text-muted))', fontSize: '12px' }}>⌘V</span>
                     </button>
+                    {selectedIds.length === 2 && (
+                        <button 
+                            onClick={() => { useCanvasStore.getState().createMaskFromSelection(); setContextMenu(null); }}
+                            style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'transparent', border: 'none', color: 'hsl(var(--color-text-primary))', cursor: 'pointer', textAlign: 'left', borderRadius: 'var(--radius-sm)' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--color-border))'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                            <span>Mask</span>
+                            <span style={{ color: 'hsl(var(--color-text-muted))', fontSize: '12px' }}></span>
+                        </button>
+                    )}
                 </div>
             )}
 
-            {/* HUD */}
-            <ZoomControls />
         </div>
     );
 }

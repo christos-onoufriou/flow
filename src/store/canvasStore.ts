@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export interface Shape {
     id: string;
-    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard' | 'image' | 'video' | 'svg';
+    type: 'rectangle' | 'ellipse' | 'line' | 'text' | 'group' | 'artboard' | 'image' | 'video' | 'svg' | 'lottie';
     name?: string;
     locked?: boolean;
     x: number;
@@ -73,6 +73,7 @@ interface CanvasState {
     distributeShapes: (distribution: 'horizontal' | 'vertical') => void;
     toggleVisibility: (id: string) => void;
     toggleMask: () => void;
+    createMaskFromSelection: () => void;
     moveToArtboard: (shapeId: string, artboardId: string | null) => void;
     moveLayer: (dragId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
     templates: Template[];
@@ -927,9 +928,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         };
     }),
     toggleMask: () => set((state) => {
-        const newPast = [...state.past, state.shapes];
-        let newShapes = [...state.shapes];
-        
+        if (state.selectedIds.length === 0) return {};
+
         const toggleMaskDeep = (shapes: Shape[], ids: string[]): Shape[] => {
             return shapes.map(shape => {
                 if (ids.includes(shape.id)) {
@@ -942,12 +942,49 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             });
         };
 
+        const newShapes = [...state.shapes];
+        const newPast = [...state.past, state.shapes];
+
         return {
             shapes: toggleMaskDeep(newShapes, state.selectedIds),
             past: newPast,
             future: []
         };
     }),
+    createMaskFromSelection: () => {
+        const state = get();
+        if (state.selectedIds.length !== 2) return;
+
+        const order: string[] = [];
+        const traverse = (shps: Shape[]) => {
+            for (const s of shps) {
+                if (state.selectedIds.includes(s.id)) order.push(s.id);
+                if (s.children) traverse(s.children);
+            }
+        };
+        traverse(state.shapes);
+
+        if (order.length !== 2) return;
+
+        const bottomShapeId = order[0];
+        const topShapeId = order[1];
+
+        set((currentState) => {
+            const removeRes = findAndRemove(currentState.shapes, topShapeId);
+            if (removeRes.shape) {
+                const insertRes = insertRelative(removeRes.shapes, bottomShapeId, removeRes.shape, 'after');
+                if (insertRes.success) {
+                    const finalShapes = recursiveUpdate(insertRes.shapes, topShapeId, { isMask: true });
+                    return {
+                        shapes: finalShapes,
+                        past: [...currentState.past, currentState.shapes],
+                        future: []
+                    };
+                }
+            }
+            return {};
+        });
+    },
     moveToArtboard: (shapeId, artboardId) => set((state) => {
         const shape = state.shapes.find(s => s.id === shapeId);
         if (!shape) return {}; // Shape not found in root (handling nested requires more logic, skipping for MVP)

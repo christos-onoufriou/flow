@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ASSET_LIBRARY } from '@/data/assets';
 import { PHOTO_LIBRARY } from '@/data/photos';
+import Lottie from 'lottie-react';
 
 interface AssetsModalProps {
     isOpen: boolean;
@@ -13,7 +14,7 @@ interface AssetsModalProps {
 }
 
 export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
-    const CATEGORIES = type === 'photos' ? ['Board', 'Events'] : type === 'shapes' ? ['Standalone', 'Compositions'] : Object.keys(ASSET_LIBRARY).filter(c => !['Standalone', 'Compositions'].includes(c));
+    const CATEGORIES = type === 'photos' ? ['Board', 'Events'] : type === 'shapes' ? ['Standalone', 'Compositions', 'Animated'] : Object.keys(ASSET_LIBRARY).filter(c => !['Standalone', 'Compositions', 'Animated'].includes(c));
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
 
     React.useEffect(() => {
@@ -176,18 +177,33 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
                                                 const targetX = (500 - offset.x) / zoom;
                                                 const targetY = (400 - offset.y) / zoom;
 
+                                                const isAnimated = selectedCategory === 'Animated';
                                                 let initialW = 200;
                                                 let initialH = 200;
-                                                const vbMatch = asset.content.match(/viewBox="[\d\.-]+\s+[\d\.-]+\s+([\d\.-]+)\s+([\d\.-]+)"/);
-                                                if (vbMatch) {
-                                                    initialW = parseFloat(vbMatch[1]);
-                                                    initialH = parseFloat(vbMatch[2]);
+                                                let animationData = null;
+
+                                                if (isAnimated) {
+                                                    try {
+                                                        animationData = JSON.parse(asset.content);
+                                                        if (animationData.w && animationData.h) {
+                                                            initialW = animationData.w;
+                                                            initialH = animationData.h;
+                                                        }
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                    }
                                                 } else {
-                                                    const wMatch = asset.content.match(/width="([\d\.-]+)[a-z]*"/i);
-                                                    const hMatch = asset.content.match(/height="([\d\.-]+)[a-z]*"/i);
-                                                    if (wMatch && hMatch) {
-                                                        initialW = parseFloat(wMatch[1]);
-                                                        initialH = parseFloat(hMatch[1]);
+                                                    const vbMatch = asset.content.match(/viewBox="[\d\.-]+\s+[\d\.-]+\s+([\d\.-]+)\s+([\d\.-]+)"/);
+                                                    if (vbMatch) {
+                                                        initialW = parseFloat(vbMatch[1]);
+                                                        initialH = parseFloat(vbMatch[2]);
+                                                    } else {
+                                                        const wMatch = asset.content.match(/width="([\d\.-]+)[a-z]*"/i);
+                                                        const hMatch = asset.content.match(/height="([\d\.-]+)[a-z]*"/i);
+                                                        if (wMatch && hMatch) {
+                                                            initialW = parseFloat(wMatch[1]);
+                                                            initialH = parseFloat(hMatch[1]);
+                                                        }
                                                     }
                                                 }
 
@@ -199,7 +215,7 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
 
                                                 addShape({
                                                     id: crypto.randomUUID(),
-                                                    type: 'svg',
+                                                    type: isAnimated ? 'lottie' : 'svg',
                                                     x: targetX - initialW / 2,
                                                     y: targetY - initialH / 2,
                                                     width: initialW,
@@ -252,10 +268,16 @@ export function AssetsModal({ isOpen, type, onClose }: AssetsModalProps) {
                                                     {asset.lang}
                                                 </div>
                                             )}
-                                            <div 
-                                                style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                dangerouslySetInnerHTML={{ __html: asset.content.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid meet">') }}
-                                            />
+                                            {selectedCategory === 'Animated' ? (
+                                                <div style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Lottie animationData={JSON.parse(asset.content)} loop={true} autoplay={true} style={{ width: '100%', height: '100%' }} />
+                                                </div>
+                                            ) : (
+                                                <div 
+                                                    style={{ width: '80%', height: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    dangerouslySetInnerHTML={{ __html: asset.content.replace(/<svg([^>]*)>/, '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid meet">') }}
+                                                />
+                                            )}
                                         </div>
                                     ))}
                                 </div>

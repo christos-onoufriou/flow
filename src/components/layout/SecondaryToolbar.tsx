@@ -112,7 +112,7 @@ export function SecondaryToolbar() {
                 borderRadius: 'var(--radius-md)',
                 padding: '4px',
                 display: 'flex',
-                gap: '8px',
+                gap: '6px',
                 boxShadow: 'var(--shadow-md)',
                 zIndex: 100,
                 width: 'max-content'

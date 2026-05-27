@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Search, Link2, Unlink2 } from 'lucide-react';
 
 import { useCanvasStore } from "@/store/canvasStore";
-import { exportSelectionToSVG, exportSelectionToPNG } from "@/utils/exportUtils";
+import { exportSelectionToSVG, exportSelectionToPNG, exportArtboardToPNG, exportArtboardToJPG } from "@/utils/exportUtils";
 import { findShape } from "@/utils/shapeUtils";
 
 export function PropertiesPanel() {
@@ -692,15 +692,27 @@ function PropertiesPanelContent() {
                 {/* Template Option */}
                 {shape.type === 'artboard' && <TemplateProperties shape={shape} onChange={handleChange} onAddTemplate={addTemplate} buttonStyle={buttonStyle} />}
 
+                {/* Export Artboard (only when an artboard is selected) */}
+                {shape.type === 'artboard' && (
+                    <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
+                        <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Artboard</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <button onClick={() => exportArtboardToJPG(shape)} style={buttonStyle}>JPG</button>
+                            <button onClick={() => exportArtboardToPNG(shape)} style={buttonStyle}>PNG</button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Export */}
-                <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
-                    <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <button onClick={() => exportSelectionToSVG([shape], `${shape.type}-${shape.id.slice(0, 4)}.svg`)} style={buttonStyle}>SVG</button>
-                        <button onClick={() => exportSelectionToPNG([shape], `${shape.type}-${shape.id.slice(0, 4)}.png`)} style={buttonStyle}>PNG</button>
+                {shape.type !== 'artboard' && (
+                    <div style={{ borderTop: "1px solid hsl(var(--color-border))", paddingTop: "var(--space-4)", marginTop: "var(--space-4)" }}>
+                        <h3 style={{ fontSize: "var(--text-sm)", color: "hsl(var(--color-text-muted))", marginBottom: "var(--space-2)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <button onClick={() => exportSelectionToSVG([shape], `${shape.type}-${shape.id.slice(0, 4)}.svg`)} style={buttonStyle}>SVG</button>
+                            <button onClick={() => exportSelectionToPNG([shape], `${shape.type}-${shape.id.slice(0, 4)}.png`)} style={buttonStyle}>PNG</button>
+                        </div>
                     </div>
-                </div>
+                )}
 
 
             </div>
